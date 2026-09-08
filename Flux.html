@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Analyse des Flux GPEEC - CAF numérique NG v1.4 BETA</title>
+    <script src="libs/tailwindcss.js"></script>
+    <script src="libs/chart.js"></script>
+    <script src="libs/sql-wasm.js"></script>
+    <script src="libs/sql-wasm-b64.js"></script>
+    <script src="sqlite-engine.js?v=1.4.1"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background-color: rgba(31, 41, 55, 0.5); }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 p-6 min-h-screen flex flex-col gap-6">
+
+    <!-- NAV BANNER -->
+    <header class="relative z-[100] bg-gray-800 border border-gray-700 p-3 flex flex-wrap justify-between items-center gap-3 rounded-lg shadow-lg">
+        <div class="flex items-center gap-3 flex-wrap">
+            <span class="text-lg font-black text-emerald-400">🛸 CAF numérique NG</span>
+            <div class="relative group" id="unifiedMenuContainer" onmouseenter="document.getElementById('unifiedMenu').classList.remove('hidden')" onmouseleave="document.getElementById('unifiedMenu').classList.add('hidden')">
+                <button class="flex flex-col justify-center items-center gap-1 p-2 rounded hover:bg-gray-700 transition focus:outline-none bg-gray-900/80 border border-gray-700">
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                </button>
+                <div id="unifiedMenu" class="hidden absolute left-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-2 space-y-1 text-xs font-semibold">
+                    <div class="text-[10px] uppercase text-gray-500 font-bold mb-1 border-b border-gray-700 pb-1 px-2">Navigation</div>
+                    <a href="Planning.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">🚀 Planning</a>
+                    <a href="Synthèse.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">📊 Synthèse</a>
+                    <a href="Flux.html" class="block w-full text-left px-3 py-2 rounded text-white shadow font-extrabold bg-cyan-600 flex items-center gap-2">🔄 Flux GPEEC</a>
+                    <a href="Parc.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">🚁 Parc</a>
+                    <a href="RH.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">👨‍🏫 RH Formateurs</a>
+                    <a href="conduite.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">📅 Conduite</a>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 ml-auto">
+            <button id="btnOpenFluxEditor" onclick="openFluxModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3 py-1.5 rounded text-xs shadow flex items-center gap-1.5 transition">
+                📊 Éditer les Flux (Besoins/Propos)
+            </button>
+            <div id="navUserBadge" class="flex items-center gap-2 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-1 text-xs">
+            </div>
+        </div>
+    </header>
+
+    <!-- MODALE CENTRALE : BASE DE DONNÉES FLUX -->
+    <div id="fluxModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[100] hidden">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg w-11/12 max-w-7xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h2 class="text-lg font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">📊 Base de Données Flux GPEEC (Besoins & Propositions)</h2>
+                <button onclick="closeFluxModal()" class="text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
+            </div>
+            
+            <div class="p-6 overflow-x-auto custom-scrollbar flex-1">
+                <table class="w-full text-xs text-center border-collapse">
+                    <thead id="flux-editor-head" class="text-gray-400 border-b border-gray-600"></thead>
+                    <tbody id="flux-editor-body"></tbody>
+                </table>
+            </div>
+
+            <div class="p-4 border-t border-gray-700 flex justify-end">
+                <button onclick="closeFluxModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-2 rounded font-semibold text-sm shadow transition">
+                    Valider & Fermer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ZONE DES GRAPHIQUES (Plein écran) -->
+    <main class="flex-1 grid grid-cols-1 gap-6">
+        
+        <!-- Graphique 1 -->
+        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl relative h-[350px] flex flex-col">
+            <button onclick="downloadChart('chart-annuel', 'Flux_Annuel_CAF')" class="absolute top-3 right-4 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 p-1.5 rounded transition shadow z-10" title="Exporter l'image pour PPT">📷 Exporter</button>
+            <div class="flex-1 relative w-full h-full"><canvas id="chart-annuel"></canvas></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Graphique 2 -->
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl relative h-[350px] flex flex-col">
+                <button onclick="downloadChart('chart-cumule', 'Flux_Cumule_CAF')" class="absolute top-3 right-4 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 p-1.5 rounded transition shadow z-10" title="Exporter l'image pour PPT">📷 Exporter</button>
+                <div class="flex-1 relative w-full h-full"><canvas id="chart-cumule"></canvas></div>
+            </div>
+            
+            <!-- Graphique 3 -->
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl relative h-[350px] flex flex-col">
+                <button onclick="downloadChart('chart-suivi-ecole', 'Suivi_Production_Ecole')" class="absolute top-3 right-4 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 p-1.5 rounded transition shadow z-10" title="Exporter l'image pour PPT">📷 Exporter</button>
+                
+                <!-- Titre et Sélecteur d'année façon tableau de bord -->
+                <div class="flex items-center gap-4 mb-2 z-10">
+                    <h2 class="text-emerald-400 font-bold text-lg flex items-center gap-2"> Flux École</h2>
+                    <select id="ecoleYearSelect" onchange="updateGraph3()" class="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs font-bold text-emerald-400 focus:outline-none cursor-pointer shadow-inner">
+                        <!-- Les années seront injectées ici par le Javascript -->
+                    </select>
+                </div>
+
+                <div class="flex-1 relative w-full h-full"><canvas id="chart-suivi-ecole"></canvas></div>
+            </div>
+        </div>
+    </main>
+
+<script>
+    let chartAnnuelInstance = null;
+    let chartCumuleInstance = null;
+    let chartEcoleInstance = null;
+
+    function getFluxData() {
+        let data = [];
+        try { 
+            let parsed = JSON.parse(localStorage.getItem('caf_scenarios_flux')); 
+            if (Array.isArray(parsed)) data = parsed;
+        } catch(e) {}
+        
+        let yearsList = [];
+        try { yearsList = JSON.parse(localStorage.getItem('caf_years_list_v3')) || [new Date().getFullYear()]; } catch(e) {}
+        
+        let updated = false;
+        yearsList.forEach(y => {
+            if (!data.find(d => d.annee === y)) {
+                data.push({ annee: y, besoin: 0, proposition: 0 });
+                updated = true;
+            }
+        });
+        
+        data.sort((a, b) => a.annee - b.annee);
+        
+        if (updated || data.length === 0) {
+            localStorage.setItem('caf_scenarios_flux', JSON.stringify(data)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('flux');
+        }
+        return data;
+    }
+
+    function init() {
+        const fluxData = getFluxData();
+        
+        const select = document.getElementById('ecoleYearSelect');
+        if (select) {
+            select.innerHTML = '';
+            fluxData.forEach(d => {
+                select.innerHTML += `<option value="${d.annee}">Année ${d.annee}</option>`;
+            });
+		let globalYear = localStorage.getItem('caf_active_year');
+           	 if (globalYear) select.value = globalYear;
+        }
+
+        updateCharts();
+        updateGraph3();
+    }
+
+    // --- LE MOTEUR TEMPOREL CORRIGÉ (Prend en compte l'objet offWeeksMulti sans le casser) ---
+    function getRealEndDate(startYear, startWeek, duration, offWeeksMulti) {
+        let currentYear = parseInt(startYear) || new Date().getFullYear();
+        let currentWeek = parseInt(startWeek) || 1;
+        let parsedDuration = parseInt(duration) || 2;
+        let activeWeeksCount = 0;
+        
+        let loops = 0;
+
+        while (activeWeeksCount < parsedDuration && loops < 200) {
+            loops++;
+            
+            // On vérifie délicatement si la semaine actuelle est cochée comme vacance (true)
+            let isOff = false;
+            if (offWeeksMulti && offWeeksMulti[currentYear]) {
+                isOff = (offWeeksMulti[currentYear][currentWeek] === true);
+            }
+            
+            // Si ce n'est PAS une vacance, c'est une semaine active pour le stagiaire
+            if (!isOff) {
+                activeWeeksCount++;
+            }
+            
+            // Si le stagiaire a fait toutes ses semaines actives, il est diplômé SUR cette semaine
+            if (activeWeeksCount === parsedDuration) {
+                break; 
+            }
+
+            // Sinon on avance le calendrier d'une semaine
+            currentWeek++;
+            if (currentWeek > 52) {
+                currentWeek = 1;
+                currentYear++;
+            }
+        }
+        return { annee: currentYear, semaine: currentWeek };
+    }
+
+    function getSafeLocalStorage(key, defaultValue) {
+        try {
+            let val = localStorage.getItem(key);
+            return val ? JSON.parse(val) : defaultValue;
+        } catch(e) {
+            return defaultValue;
+        }
+    }
+
+    function updateCharts() {
+        const fluxData = getFluxData();
+        const stages = getSafeLocalStorage('caf_stages_v3', []);
+        const templates = getSafeLocalStorage('caf_templates_v3', {});
+        const offWeeksMulti = getSafeLocalStorage('caf_off_weeks_multi_v3', {});
+
+        let reelsPilRhc = {};
+
+        stages.forEach(s => {
+            let t = templates[s.formType];
+            let templateName = t ? (t.cours || '').toUpperCase() : '';
+            let isPil = templateName.includes('PIL');
+
+            if (isPil) {
+                let duration = s.durationOverride || (t ? t.duration : 2);
+                let endDate = getRealEndDate(s.startYear, s.startWeek, duration, offWeeksMulti);
+                let anneeFin = endDate.annee;
+                
+                let countRhc = parseInt(s.count_rhc) || 0;
+                reelsPilRhc[anneeFin] = (reelsPilRhc[anneeFin] || 0) + countRhc;
+            }
+        });
+
+        const labels = fluxData.map(d => d.annee);
+        const dataBesoin = fluxData.map(d => parseInt(d.besoin) || 0);
+        const dataPropo = fluxData.map(d => parseInt(d.proposition) || 0);
+        const dataRealPilRhc = labels.map(y => reelsPilRhc[y] || 0);
+
+        let cBesoin = [], cPropo = [], cRealRhc = [];
+        let sumB = 0, sumP = 0, sumR = 0;
+        
+        for (let i = 0; i < labels.length; i++) {
+            sumB += dataBesoin[i]; cBesoin.push(sumB);
+            sumP += dataPropo[i];  cPropo.push(sumP);
+            sumR += dataRealPilRhc[i]; cRealRhc.push(sumR);
+        }
+
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { 
+                    labels: { color: '#e5e7eb', font: { size: 11, weight: 'bold' } },
+                    onHover: function(e) { e.chart.canvas.style.cursor = 'pointer'; },
+                    onLeave: function(e) { e.chart.canvas.style.cursor = 'default'; }
+                } 
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#374151' }, ticks: { color: '#9ca3af' } },
+                x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
+            }
+        };
+
+        if (chartAnnuelInstance) {
+            chartAnnuelInstance.data.datasets[0].data = dataBesoin;
+            chartAnnuelInstance.data.datasets[1].data = dataPropo;
+            chartAnnuelInstance.data.datasets[2].data = dataRealPilRhc;
+            chartAnnuelInstance.data.datasets.forEach((ds, idx) => {
+                ds.hidden = false;
+                const meta = chartAnnuelInstance.getDatasetMeta(idx);
+                if (meta) meta.hidden = null;
+            });
+            chartAnnuelInstance.update();
+        } else {
+            chartAnnuelInstance = new Chart(document.getElementById('chart-annuel').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Besoin PILDOM', data: dataBesoin, backgroundColor: '#f87171', borderRadius: 4 },
+                        { label: 'Proposition initiale RHC', data: dataPropo, backgroundColor: '#fbbf24', borderRadius: 4 },
+                        { label: 'Nouvelle proposition A2PM (RHC)', data: dataRealPilRhc, backgroundColor: '#10b981', borderRadius: 4 }
+                    ]
+                },
+                options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: { display: true, text: 'Synthèse Annuelle', color: '#d1d5db', font: { size: 14 } } } }
+            });
+        }
+
+        if (chartCumuleInstance) {
+            chartCumuleInstance.data.datasets[0].data = cBesoin;
+            chartCumuleInstance.data.datasets[1].data = cPropo;
+            chartCumuleInstance.data.datasets[2].data = cRealRhc;
+            chartCumuleInstance.data.datasets.forEach((ds, idx) => {
+                ds.hidden = false;
+                const meta = chartCumuleInstance.getDatasetMeta(idx);
+                if (meta) meta.hidden = null;
+            });
+            chartCumuleInstance.update();
+        } else {
+            chartCumuleInstance = new Chart(document.getElementById('chart-cumule').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Cumul PILDOM', data: cBesoin, borderColor: '#f87171', backgroundColor: 'transparent', tension: 0.2, pointRadius: 3, borderWidth: 2 },
+                        { label: 'Cumul initial école', data: cPropo, borderColor: '#fbbf24', backgroundColor: 'transparent', tension: 0.2, pointRadius: 3, borderWidth: 2 },
+                        { label: 'Nouveau cumul A2PM (RHC)', data: cRealRhc, borderColor: '#10b981', backgroundColor: 'transparent', tension: 0.2, pointRadius: 4, borderWidth: 3 }
+                    ]
+                },
+                options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: { display: true, text: 'Flux cumulés RHC', color: '#d1d5db', font: { size: 14 } } } }
+            });
+        }
+    }
+
+function updateGraph3() {
+        const select = document.getElementById('ecoleYearSelect');
+        if (!select) return;
+        const selectedYear = parseInt(select.value) || new Date().getFullYear();
+
+        // Sauvegarde l'année globale pour la synchro
+        localStorage.setItem('caf_active_year', selectedYear);
+
+        const stages = getSafeLocalStorage('caf_stages_v3', []);
+        const templates = getSafeLocalStorage('caf_templates_v3', {});
+        const offWeeksMulti = getSafeLocalStorage('caf_off_weeks_multi_v3', {});
+
+        let diplomasPil = new Array(53).fill(0);
+        let diplomasMo = new Array(53).fill(0);
+
+        // --- NOUVEAU : On crée les variables d'héritage ---
+        let heritagePil = 0;
+        let heritageMo = 0;
+
+        stages.forEach(s => {
+            let t = templates[s.formType];
+            let templateName = t ? (t.cours || '').toUpperCase() : '';
+            let isPil = templateName.includes('PIL');
+            let isMo = templateName.includes('TRI') || templateName.includes('TTI') || templateName.includes('MO');
+
+            let duration = s.durationOverride || (t ? t.duration : 2);
+            let endDate = getRealEndDate(s.startYear, s.startWeek, duration, offWeeksMulti);
+            
+            let anneeFin = endDate.annee;
+            let semaineFin = endDate.semaine;
+
+            let countEcole = parseInt(s.count_ecole) || 0;
+
+            if (anneeFin < selectedYear) {
+                if (isPil) heritagePil += countEcole;
+                if (isMo) heritageMo += countEcole;
+            } else if (anneeFin === selectedYear && semaineFin <= 52) {
+                if (isPil) diplomasPil[semaineFin] += countEcole;
+                if (isMo) diplomasMo[semaineFin] += countEcole;
+            }
+        });
+
+        const labels = [];
+        const cRealPilEcole = [];
+        const cRealMoEcole = [];
+        
+        // --- NOUVEAU : Les compteurs démarrent avec le cumul des années précédentes ---
+        let sumPE = heritagePil;
+        let sumME = heritageMo;
+
+        for (let w = 1; w <= 52; w++) {
+            labels.push('S' + w);
+            sumPE += diplomasPil[w];
+            sumME += diplomasMo[w];
+            cRealPilEcole.push(sumPE);
+            cRealMoEcole.push(sumME);
+        }
+
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { labels: { color: '#e5e7eb', font: { size: 11, weight: 'bold' } } },
+                title: { display: false } 
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#374151' }, ticks: { color: '#9ca3af', stepSize: 1 } },
+                x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 9 } } }
+            }
+        };
+
+        if (chartEcoleInstance) {
+            chartEcoleInstance.data.labels = labels;
+            chartEcoleInstance.data.datasets[0].data = cRealPilEcole;
+            chartEcoleInstance.data.datasets[1].data = cRealMoEcole;
+            chartEcoleInstance.update();
+        } else {
+            chartEcoleInstance = new Chart(document.getElementById('chart-suivi-ecole').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'PIL École (Cumul)', data: cRealPilEcole, borderColor: '#10b981', backgroundColor: 'transparent', tension: 0, pointRadius: 3, borderWidth: 2 },
+                        { label: 'MO École (Cumul)', data: cRealMoEcole, borderColor: '#f97316', backgroundColor: 'transparent', tension: 0, pointRadius: 3, borderWidth: 2 }
+                    ]
+                },
+                options: commonOptions
+            });
+        }
+    }
+
+    function downloadChart(canvasId, filename) {
+        const originalCanvas = document.getElementById(canvasId);
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = originalCanvas.width;
+        tempCanvas.height = originalCanvas.height;
+        const ctx = tempCanvas.getContext('2d');
+        
+        ctx.fillStyle = '#1f2937';
+        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        ctx.drawImage(originalCanvas, 0, 0);
+        
+        const link = document.createElement('a');
+        link.download = `${filename}.png`;
+        link.href = tempCanvas.toDataURL('image/png');
+        link.click();
+    }
+
+    // --- ÉDITION DES FLUX (BESOINS & PROPOSITIONS) ---
+    function getFluxDataCentral() {
+        let data = [];
+        try { 
+            let parsed = JSON.parse(localStorage.getItem('caf_scenarios_flux')); 
+            if (Array.isArray(parsed)) data = parsed;
+        } catch(e) {}
+        
+        let yearsList = [];
+        try { yearsList = JSON.parse(localStorage.getItem('caf_years_list_v3')) || [new Date().getFullYear()]; } catch(e) {}
+        
+        let updated = false;
+        yearsList.forEach(y => {
+            if (!data.find(d => d.annee === y)) {
+                data.push({ annee: y, besoin: 0, proposition: 0 });
+                updated = true;
+            }
+        });
+        
+        data.sort((a, b) => a.annee - b.annee);
+        
+        if (updated || data.length === 0) {
+            localStorage.setItem('caf_scenarios_flux', JSON.stringify(data)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('flux');
+        }
+        return data;
+    }
+
+    function openFluxModal() {
+        const data = getFluxDataCentral();
+        renderFluxEditorCentral(data);
+        const modal = document.getElementById('fluxModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+        }
+    }
+
+    function closeFluxModal() {
+        const modal = document.getElementById('fluxModal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
+        }
+        updateCharts();
+        updateGraph3();
+        window.dispatchEvent(new Event('storage'));
+    }
+
+    function renderFluxEditorCentral(data) {
+        const thead = document.getElementById('flux-editor-head');
+        const tbody = document.getElementById('flux-editor-body');
+        if (!thead || !tbody) return;
+        let headerHtml = `<th class="p-2 text-left bg-gray-800 sticky left-0 z-10 border-r border-gray-700 min-w-[120px]">Indicateur</th>`;
+        data.forEach(d => { headerHtml += `<th class="p-2 min-w-[70px] font-bold text-gray-200">${d.annee}</th>`; });
+        thead.innerHTML = `<tr>${headerHtml}</tr>`;
+
+        let besoinHtml = `<td class="p-2 text-left font-bold text-red-400 bg-gray-800 sticky left-0 z-10 border-r border-gray-700 uppercase tracking-wider">Besoin Obj.</td>`;
+        data.forEach((d, i) => {
+            besoinHtml += `<td class="p-2"><input type="number" min="0" class="bg-gray-900 w-full p-1.5 text-center border border-gray-600 rounded font-bold text-red-400 focus:border-red-500 focus:outline-none" value="${d.besoin}" onchange="updateScenarioCentral(${i}, 'besoin', this.value)"></td>`;
+        });
+
+        let propoHtml = `<td class="p-2 text-left font-bold text-amber-400 bg-gray-800 sticky left-0 z-10 border-r border-gray-700 uppercase tracking-wider">Propo École</td>`;
+        data.forEach((d, i) => {
+            propoHtml += `<td class="p-2"><input type="number" min="0" class="bg-gray-900 w-full p-1.5 text-center border border-gray-600 rounded font-bold text-amber-400 focus:border-amber-500 focus:outline-none" value="${d.proposition}" onchange="updateScenarioCentral(${i}, 'proposition', this.value)"></td>`;
+        });
+
+        tbody.innerHTML = `<tr class="border-b border-gray-700/50 hover:bg-gray-800 transition">${besoinHtml}</tr><tr class="hover:bg-gray-800 transition">${propoHtml}</tr>`;
+    }
+
+    function updateScenarioCentral(index, field, value) {
+        let data = getFluxDataCentral();
+        data[index][field] = parseInt(value) || 0;
+        localStorage.setItem('caf_scenarios_flux', JSON.stringify(data)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('flux');
+        updateCharts();
+        updateGraph3();
+        window.dispatchEvent(new Event('storage'));
+    }
+
+    // --- LE CAPTEUR DE SYNCHRONISATION EN DIRECT ---
+    window.addEventListener('storage', function(e) {
+        // Détecte n'importe quel changement (ajout, modif, changement de projet) depuis l'autre onglet
+        if (e.key === 'caf_stages_v3' || e.key === 'caf_templates_v3' || e.key === 'caf_off_weeks_multi_v3' || e.key === 'caf_scenarios_flux' || e.key === 'caf_active_project_id') {
+            updateCharts();
+            updateGraph3();
+        }
+        else if (e.key === 'caf_years_list_v3') {
+            // L'année a changé dans le planning (ajout / suppression), on reconstruit le menu
+            const fluxData = getFluxDataCentral();
+            const select = document.getElementById('ecoleYearSelect');
+            if (select) {
+                select.innerHTML = '';
+                fluxData.forEach(d => {
+                    select.innerHTML += `<option value="${d.annee}">Année ${d.annee}</option>`;
+                });
+                let globalYear = localStorage.getItem('caf_active_year');
+                if (globalYear) select.value = globalYear;
+            }
+            updateGraph3();
+        }
+        else if (e.key === 'caf_active_year') {
+            const select = document.getElementById('ecoleYearSelect');
+            if (select) {
+                let options = Array.from(select.options).map(o => o.value);
+                if (!options.includes(e.newValue)) {
+                    // Si l'année n'est pas encore dans le menu, on reconstruit le menu via getFluxDataCentral
+                    const fluxData = getFluxDataCentral();
+                    select.innerHTML = '';
+                    fluxData.forEach(d => {
+                        select.innerHTML += `<option value="${d.annee}">Année ${d.annee}</option>`;
+                    });
+                }
+                select.value = e.newValue; // On aligne le menu déroulant
+            }
+            updateGraph3(); // On rafraîchit la courbe
+        }
+    });
+
+    function initSatelliteAuth() {
+        const uStr = localStorage.getItem('caf_current_user') || sessionStorage.getItem('caf_current_user');
+        if (!uStr) {
+            alert("Accès refusé. Vous devez d'abord vous connecter sur la page PLANNING.");
+            window.location.href = 'Planning.html';
+            return;
+        }
+        const user = JSON.parse(uStr);
+        if (user.role === 'invite') {
+            alert("Accès réservé. Les invités n'ont accès qu'à la page Planning.");
+            window.location.href = 'Planning.html';
+            return;
+        }
+        
+        const activeBrigade = localStorage.getItem('caf_active_brigade') || 'brg_guepard';
+        if (activeBrigade !== 'brg_guepard') {
+            alert("La page FLUX GPEEC est exclusivement réservée à la brigade GUÉPARD.");
+            window.location.href = 'Planning.html';
+            return;
+        }
+        const badge = document.getElementById('navUserBadge');
+        if (badge) {
+            let roleBadge = user.role === 'admin' 
+                ? '<span class="bg-red-900/80 text-red-300 text-[10px] font-black px-2 py-0.5 rounded border border-red-700">🔴 Admin</span>'
+                : user.role === 'planificateur'
+                ? '<span class="bg-blue-900/80 text-blue-300 text-[10px] font-black px-2 py-0.5 rounded border border-blue-700">🟡 Planif</span>'
+                : '<span class="bg-emerald-900/80 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded border border-emerald-700">🟢 Invité</span>';
+            badge.innerHTML = `<span class="text-white font-bold">👤 ${user.name}</span> ${roleBadge} <button onclick="localStorage.removeItem('caf_current_user'); sessionStorage.removeItem('caf_current_user'); window.location.href='Planning.html';" class="text-gray-400 hover:text-red-400 ml-2 font-bold" title="Déconnexion">🚪</button>`;
+        }
+        if (user.role === 'invite') {
+            const btn = document.getElementById('btnEditFlux');
+            if (btn) btn.classList.add('hidden');
+        }
+    }
+
+    async function startSatellitePage() {
+        try { await window.initSQLite(); } catch(e) {}
+        initSatelliteAuth();
+        if (typeof init === 'function') init();
+    }
+    window.onload = startSatellitePage;
+</script>
+
+    <!-- BADGE CRÉATEUR & VERSION -->
+    <div class="fixed bottom-2 right-3 text-[10px] text-gray-400 font-semibold pointer-events-none z-40 bg-gray-900/80 backdrop-blur px-2.5 py-1 rounded border border-gray-800 shadow flex items-center gap-2">
+        <span>Créateur : <b class="text-gray-200">CDT CORNET Guillaume</b></span>
+        <span class="text-emerald-400 font-mono font-bold border-l border-gray-700 pl-2">v1.4 BETA</span>
+    </div>
+</body>
+</html>

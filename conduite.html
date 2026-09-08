@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conduite de Stage - CAF numérique NG v1.4 BETA</title>
+    <script src="libs/tailwindcss.js"></script>
+    <script src="libs/sql-wasm.js"></script>
+    <script src="libs/sql-wasm-b64.js"></script>
+    <script src="sqlite-engine.js?v=1.4.1"></script>
+    <style>
+        body { margin: 0; overflow: hidden; } /* Empêche le scroll global pour une vue type application */
+        
+        /* Grille de 6h à 00h (18h au total), chaque heure a 4 quarts d'heure */
+        .grid-timeline {
+            display: grid;
+            grid-template-columns: 150px repeat(72, minmax(20px, 1fr));
+            border-bottom: 1px solid #374151;
+        }
+        .time-header {
+            grid-column: span 4; /* Une heure = 4 quarts */
+            border-right: 1px solid #4b5563;
+            text-align: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: #9ca3af;
+            background: #1f2937;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+        .quarter-line {
+            border-right: 1px dashed #374151;
+            height: 100%;
+        }
+        .hour-line {
+            border-right: 1px solid #4b5563;
+            height: 100%;
+        }
+        .lane-header {
+            position: sticky;
+            left: 0;
+            background: #111827;
+            border-right: 1px solid #374151;
+            z-index: 10;
+            padding: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+        .lane-row {
+            position: relative;
+            height: 60px;
+            background: #1f2937;
+            border-bottom: 1px solid #374151;
+        }
+        
+        /* Étiquettes Drag & Drop */
+        .activity-card {
+            cursor: grab;
+            border-radius: 4px;
+            padding: 4px;
+            color: white;
+            font-size: 9px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            transition: transform 0.1s;
+        }
+        .activity-card:active { cursor: grabbing; transform: scale(0.95); opacity: 0.8; }
+        
+        .type-cours { background-color: #4b5563; } /* Gris */
+        .type-vol { background-color: #2563eb; } /* Bleu */
+        .type-simu { background-color: #059669; } /* Vert */
+
+        .toolbox-scroll::-webkit-scrollbar { width: 6px; }
+        .toolbox-scroll::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex flex-col font-sans">
+
+    <!-- NAV BANNER -->
+    <header class="relative z-[100] bg-gray-800 border-b border-gray-700 p-2 flex flex-wrap justify-between items-center gap-3 shadow-md">
+        <div class="flex items-center gap-3 flex-wrap">
+            <span class="text-base font-black text-emerald-400">🛸 CAF numérique NG</span>
+            <div class="relative group" id="unifiedMenuContainer" onmouseenter="document.getElementById('unifiedMenu').classList.remove('hidden')" onmouseleave="document.getElementById('unifiedMenu').classList.add('hidden')">
+                <button class="flex flex-col justify-center items-center gap-1 p-2 rounded hover:bg-gray-700 transition focus:outline-none bg-gray-900/80 border border-gray-700">
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                </button>
+                <div id="unifiedMenu" class="hidden absolute left-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-2 space-y-1 text-xs font-semibold">
+                    <div class="text-[10px] uppercase text-gray-500 font-bold mb-1 border-b border-gray-700 pb-1 px-2">Navigation</div>
+                    <a href="Planning.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">🚀 Planning</a>
+                    <a href="Synthèse.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">📊 Synthèse</a>
+                    <a href="Flux.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">🔄 Flux GPEEC</a>
+                    <a href="Parc.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">🚁 Parc</a>
+                    <a href="RH.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">👨‍🏫 RH Formateurs</a>
+                    <a href="conduite.html" class="block w-full text-left px-3 py-2 rounded text-white shadow font-extrabold bg-rose-600 flex items-center gap-2">📅 Conduite</a>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 ml-auto">
+            <div class="flex gap-2">
+                <button onclick="setView('jour')" id="btnJour" class="px-3 py-1 bg-emerald-600 text-white font-bold rounded text-xs shadow">Vue Quotidienne</button>
+                <button onclick="setView('hebdo')" id="btnHebdo" class="px-3 py-1 bg-gray-700 text-gray-300 font-bold rounded text-xs hover:bg-gray-600 border border-gray-600">Vue Hebdo</button>
+            </div>
+            <div id="navUserBadge" class="flex items-center gap-2 bg-gray-900/80 border border-gray-700 rounded-lg px-2.5 py-0.5 text-xs">
+            </div>
+        </div>
+    </header>
+
+    <!-- ZONE PRINCIPALE (Grille + Toolbox) -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- TOOLBOX (Syllabus à gauche) -->
+        <div class="w-64 bg-gray-850 border-r border-gray-700 flex flex-col">
+            <div class="p-2 border-b border-gray-700 bg-gray-800">
+                <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">📋 Syllabus (À placer)</div>
+                <select id="stageFilter" onchange="renderToolbox()" class="w-full bg-gray-900 border border-gray-600 rounded p-1 text-xs font-bold text-white focus:outline-none">
+                    <option value="ALL">Tous les stages actifs</option>
+                    <!-- Rempli en JS -->
+                </select>
+            </div>
+            
+            <div id="toolboxItems" class="flex-1 overflow-y-auto p-2 space-y-2 toolbox-scroll bg-gray-900/50">
+                <!-- Les étiquettes générées apparaîtront ici -->
+            </div>
+        </div>
+
+        <!-- GRILLE DE PLANIFICATION -->
+        <div class="flex-1 flex flex-col relative overflow-auto bg-gray-800">
+            <!-- Entête des heures -->
+            <div class="grid-timeline bg-gray-900 shadow-md sticky top-0 z-20">
+                <div class="lane-header text-gray-500 uppercase justify-center">Ressources</div>
+                <!-- Génération des 18 heures (6h à 23h) -->
+                <script>
+                    for(let i=6; i<24; i++) {
+                        document.write(`<div class="time-header p-1">${i}h00</div>`);
+                    }
+                </script>
+            </div>
+
+            <!-- Conteneur des lignes (Stagiaires / Groupes) -->
+            <div id="planningGrid" class="flex-1 relative">
+                <!-- Rempli en JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER : NAVIGATION TEMPORELLE -->
+    <footer class="bg-gray-800 border-t border-gray-700 p-2 flex justify-center items-center gap-4 z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        
+        <!-- Menu Vue Quotidienne -->
+        <div id="navJour" class="flex gap-1">
+            <button class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold transition text-white">Lundi</button>
+            <button class="px-3 py-1 bg-gray-900 border border-emerald-500 text-emerald-400 rounded text-xs font-bold shadow-[0_0_8px_rgba(16,185,129,0.3)]">Mardi</button>
+            <button class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold transition text-white">Mercredi</button>
+            <button class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold transition text-white">Jeudi</button>
+            <button class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold transition text-white">Vendredi</button>
+        </div>
+
+        <!-- Menu Vue Hebdo (Caché par défaut) -->
+        <div id="navHebdo" class="flex items-center gap-2 hidden">
+            <button class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs">◀</button>
+            <select class="bg-gray-900 border border-gray-600 rounded p-1 text-xs font-bold text-white focus:outline-none">
+                <script>
+                    for(let i=1; i<=52; i++) document.write(`<option value="${i}">Semaine ${i}</option>`);
+                </script>
+            </select>
+            <button class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs">▶</button>
+        </div>
+    </footer>
+
+    <script>
+        // --- DONNÉES SIMULÉES POUR LE PROTOTYPE ---
+        // (À terme, tu feras un JSON.parse(localStorage.getItem(...)))
+        let currentView = 'jour'; // 'jour' ou 'hebdo'
+        let draggedItem = null;
+
+        const stagesMock = [
+            { id: 's1', customName: 'PIL 03 2026', type: 'PIL', students: ['Dupont', 'Garcia'] },
+            { id: 's2', customName: 'CB Alpha', type: 'CB', students: ['Martin'] }
+        ];
+
+        // --- INITIALISATION ---
+        function init() {
+            populateStageFilter();
+            renderToolbox();
+            renderGrid();
+        }
+
+        // --- BASCULE DES VUES (Jour / Hebdo) ---
+        function setView(view) {
+            currentView = view;
+            
+            // UI Boutons Haut
+            document.getElementById('btnJour').className = view === 'jour' ? "px-4 py-1 bg-emerald-600 text-white font-bold rounded text-xs shadow" : "px-4 py-1 bg-gray-700 text-gray-300 font-bold rounded text-xs hover:bg-gray-600 border border-gray-600";
+            document.getElementById('btnHebdo').className = view === 'hebdo' ? "px-4 py-1 bg-emerald-600 text-white font-bold rounded text-xs shadow" : "px-4 py-1 bg-gray-700 text-gray-300 font-bold rounded text-xs hover:bg-gray-600 border border-gray-600";
+            
+            // UI Footer
+            document.getElementById('navJour').style.display = view === 'jour' ? 'flex' : 'none';
+            document.getElementById('navHebdo').style.display = view === 'hebdo' ? 'flex' : 'none';
+
+            // Redessiner les étiquettes déjà posées sur la grille pour adapter l'affichage
+            renderGridItems(); 
+        }
+
+        function populateStageFilter() {
+            const select = document.getElementById('stageFilter');
+            stagesMock.forEach(s => {
+                select.innerHTML += `<option value="${s.id}">${s.customName}</option>`;
+            });
+        }
+
+        // --- GÉNÉRATION DU SYLLABUS ---
+        function renderToolbox() {
+            const container = document.getElementById('toolboxItems');
+            const filter = document.getElementById('stageFilter').value;
+            container.innerHTML = '';
+
+            stagesMock.forEach(stage => {
+                if(filter !== 'ALL' && filter !== stage.id) return;
+
+                // 1. Cours Théorique (Pour le groupe entier)
+                container.appendChild(createCardHTML('TH-01 Météo', 'type-cours', stage.customName, 'Groupe Entier'));
+
+                // 2. Vols et Simus (Individualisés)
+                stage.students.forEach(student => {
+                    container.appendChild(createCardHTML('VOL-01 Mania', 'type-vol', stage.customName, student));
+                    container.appendChild(createCardHTML('SIM-01 Pannes', 'type-simu', stage.customName, student));
+                });
+            });
+        }
+
+        function createCardHTML(title, colorClass, stageName, studentName) {
+            const card = document.createElement('div');
+            card.className = `activity-card ${colorClass} h-14 relative`;
+            card.draggable = true;
+            
+            // On stocke les data pour l'affichage dynamique Jour/Hebdo
+            card.dataset.title = title;
+            card.dataset.stage = stageName;
+            card.dataset.student = studentName;
+            card.dataset.instructor = "Non assigné";
+            card.dataset.machine = "Non assignée";
+
+            // Event Drag
+            card.ondragstart = (e) => {
+                draggedItem = card;
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => card.style.opacity = '0.5', 0);
+            };
+            card.ondragend = () => {
+                draggedItem = null;
+                card.style.opacity = '1';
+                updateCardDisplay(card); // Met à jour l'affichage selon la zone
+            };
+
+            updateCardDisplay(card, true); // True = Affichage mode toolbox
+            return card;
+        }
+
+        // --- DESSINER LA GRILLE (VUE PAR STAGE) ---
+        function renderGrid() {
+            const grid = document.getElementById('planningGrid');
+            grid.innerHTML = '';
+
+            stagesMock.forEach(stage => {
+                // On crée une seule et unique ligne pour tout le stage
+                grid.appendChild(createLane(`📌 ${stage.customName}`, 'bg-gray-800'));
+            });
+        }
+
+        function createLane(label, bgClass) {
+            const row = document.createElement('div');
+            // min-h-[80px] permet à la ligne de grandir toute seule si on empile plein d'étiquettes
+            row.className = `grid-timeline ${bgClass} min-h-[80px] border-b border-gray-700`;
+
+            // Entête de la ligne (Nom du stage)
+            const header = document.createElement('div');
+            header.className = 'lane-header text-gray-300';
+            header.innerText = label;
+            row.appendChild(header);
+
+            // Les 72 quarts d'heure
+            for(let i=0; i<72; i++) {
+                const cell = document.createElement('div');
+                cell.className = i % 4 === 3 ? 'hour-line' : 'quarter-line';
+                
+                // Flexbox pour empiler proprement les étiquettes lâchées au même endroit
+                cell.style.display = 'flex';
+                cell.style.flexDirection = 'column';
+                cell.style.gap = '4px';
+                cell.style.padding = '2px';
+                cell.style.minWidth = '20px'; // Pour éviter l'écrasement
+                
+                // Drop events
+                cell.ondragover = (e) => { e.preventDefault(); cell.style.backgroundColor = 'rgba(16, 185, 129, 0.2)'; };
+                cell.ondragleave = () => { cell.style.backgroundColor = ''; };
+                cell.ondrop = (e) => {
+                    e.preventDefault();
+                    cell.style.backgroundColor = '';
+                    if(draggedItem) {
+                        cell.appendChild(draggedItem);
+                        draggedItem.style.width = '120px'; // Largeur de base une fois posé
+                        draggedItem.style.position = 'relative'; // On annule l'absolu pour les empiler naturellement
+                        draggedItem.style.zIndex = '40';
+                        
+                        // Si lâché sur la grille, on demande d'affecter (simulation MVP)
+                        if(draggedItem.dataset.instructor === "Non assigné" && draggedItem.className.includes('type-vol')) {
+                            draggedItem.dataset.instructor = prompt("Affecter un instructeur (ex: Cornet) :") || "Non assigné";
+                            draggedItem.dataset.machine = prompt("Affecter une machine (ex: FNC-01) :") || "Non assignée";
+                            updateCardDisplay(draggedItem); // Met à jour le texte
+                        }
+                    }
+                };
+                row.appendChild(cell);
+            }
+            return row;
+        }
+
+        // --- AFFICHAGE ADAPTATIF DES ÉTIQUETTES ---
+        function updateCardDisplay(card, isToolbox = false) {
+            if(isToolbox) {
+                // Affichage compact pour la boîte à syllabus
+                card.innerHTML = `
+                    <div class="truncate border-b border-white/20 pb-0.5">${card.dataset.title}</div>
+                    <div class="text-[8px] font-normal truncate">${card.dataset.stage} - ${card.dataset.student}</div>
+                `;
+            } else if (currentView === 'jour') {
+                // Affichage max détaillé
+                card.innerHTML = `
+                    <div class="truncate text-[10px] drop-shadow-md">${card.dataset.title}</div>
+                    <div class="text-[8px] font-normal leading-tight mt-1">
+                        <div>👨‍🏫 ${card.dataset.instructor}</div>
+                        <div>👤 ${card.dataset.student}</div>
+                        <div>🚁 ${card.dataset.machine}</div>
+                    </div>
+                `;
+            } else {
+                // Affichage réduit (Hebdo)
+                card.innerHTML = `
+                    <div class="truncate border-b border-white/20 pb-0.5">${card.dataset.title}</div>
+                    <div class="text-[8px] font-normal truncate mt-1">👤 ${card.dataset.student}</div>
+                `;
+            }
+        }
+
+        function renderGridItems() {
+            // Met à jour l'affichage de toutes les cartes posées sur la grille quand on change de vue
+            document.querySelectorAll('#planningGrid .activity-card').forEach(card => updateCardDisplay(card));
+        }
+
+        function initSatelliteAuth() {
+            const uStr = localStorage.getItem('caf_current_user') || sessionStorage.getItem('caf_current_user');
+            if (!uStr) {
+                alert("Accès refusé. Vous devez d'abord vous connecter sur la page PLANNING.");
+                window.location.href = 'Planning.html';
+                return;
+            }
+            const user = JSON.parse(uStr);
+            if (user.role === 'invite') {
+                alert("Accès réservé. Les invités n'ont accès qu'à la page Planning.");
+                window.location.href = 'Planning.html';
+                return;
+            }
+            const badge = document.getElementById('navUserBadge');
+            if (badge) {
+                let roleBadge = user.role === 'admin' 
+                    ? '<span class="bg-red-900/80 text-red-300 text-[10px] font-black px-2 py-0.5 rounded border border-red-700">🔴 Admin</span>'
+                    : user.role === 'planificateur'
+                    ? '<span class="bg-blue-900/80 text-blue-300 text-[10px] font-black px-2 py-0.5 rounded border border-blue-700">🟡 Planif</span>'
+                    : '<span class="bg-emerald-900/80 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded border border-emerald-700">🟢 Invité</span>';
+            badge.innerHTML = `<span class="text-white font-bold">👤 ${user.name}</span> ${roleBadge} <button onclick="localStorage.removeItem('caf_current_user'); sessionStorage.removeItem('caf_current_user'); window.location.href='Planning.html';" class="text-gray-400 hover:text-red-400 ml-2 font-bold" title="Déconnexion">🚪</button>`;
+        }
+        
+        // Hide Flux link if not Guepard
+        const activeBrigade = localStorage.getItem('caf_active_brigade') || 'brg_guepard';
+        if (activeBrigade !== 'brg_guepard') {
+            document.querySelectorAll('a[href="Flux.html"]').forEach(l => l.style.display = 'none');
+        }
+        }
+
+        async function startSatellitePage() {
+            try { await window.initSQLite(); } catch(e) {}
+            initSatelliteAuth();
+            if (typeof init === 'function') init();
+        }
+        window.onload = startSatellitePage;
+    </script>
+
+    <!-- BADGE CRÉATEUR & VERSION -->
+    <div class="fixed bottom-2 right-3 text-[10px] text-gray-400 font-semibold pointer-events-none z-40 bg-gray-900/80 backdrop-blur px-2.5 py-1 rounded border border-gray-800 shadow flex items-center gap-2">
+        <span>Créateur : <b class="text-gray-200">CDT CORNET Guillaume</b></span>
+        <span class="text-emerald-400 font-mono font-bold border-l border-gray-700 pl-2">v1.4 BETA</span>
+    </div>
+</body>
+</html>

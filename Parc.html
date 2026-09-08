@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestion du Parc Machines - CAF numérique NG v1.4 BETA</title>
+    <script src="libs/tailwindcss.js"></script>
+    <script src="libs/sql-wasm.js"></script>
+    <script src="libs/sql-wasm-b64.js"></script>
+    <script src="sqlite-engine.js?v=1.4.1"></script>
+    
+    </head>
+<body class="bg-gray-900 text-gray-100 p-6">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- NAV BANNER -->
+        <header class="relative z-[100] bg-gray-800 border border-gray-700 p-3 mb-6 flex flex-wrap justify-between items-center gap-3 rounded-lg shadow-lg">
+            <div class="flex items-center gap-3 flex-wrap">
+                <span class="text-lg font-black text-emerald-400">🛸 CAF numérique NG</span>
+                <div class="relative group" id="unifiedMenuContainer" onmouseenter="document.getElementById('unifiedMenu').classList.remove('hidden')" onmouseleave="document.getElementById('unifiedMenu').classList.add('hidden')">
+                <button class="flex flex-col justify-center items-center gap-1 p-2 rounded hover:bg-gray-700 transition focus:outline-none bg-gray-900/80 border border-gray-700">
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                </button>
+                <div id="unifiedMenu" class="hidden absolute left-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-2 space-y-1 text-xs font-semibold">
+                    <div class="text-[10px] uppercase text-gray-500 font-bold mb-1 border-b border-gray-700 pb-1 px-2">Navigation</div>
+                    <a href="Planning.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">🚀 Planning</a>
+                    <a href="Synthèse.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">📊 Synthèse</a>
+                    <a href="Flux.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">🔄 Flux GPEEC</a>
+                    <a href="Parc.html" class="block w-full text-left px-3 py-2 rounded text-white shadow font-extrabold bg-amber-600 flex items-center gap-2">🚁 Parc</a>
+                    <a href="RH.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">👨‍🏫 RH Formateurs</a>
+                    <a href="conduite.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">📅 Conduite</a>
+                </div>
+            </div>
+        <div class="flex items-center gap-3 ml-auto">
+            <div id="navUserBadge" class="flex items-center gap-2 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-1 text-xs">
+            </div>
+        </div>
+        </header>
+
+        <header class="relative z-[100] flex justify-between items-center mb-8">
+            <h1 class="text-2xl font-bold text-emerald-400">⚙️ Parc Machines : <span id="display-year">2026</span></h1>
+            <div class="flex gap-3 items-center">
+                <button id="btnOpenParcEditor" onclick="openParcModal()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-4 py-2 rounded text-xs shadow flex items-center gap-2 transition">
+                    ⚙️ Gestion du Parc & Plafonds
+                </button>
+                <select id="year-selector" onchange="changeYear(this.value)" class="bg-gray-800 border border-gray-600 px-4 py-2 rounded font-bold text-emerald-400 text-xs">
+                    <option value="2026">2026</option><option value="2027">2027</option>
+                    <option value="2028">2028</option><option value="2029">2029</option>
+                    <option value="2030">2030</option>
+                </select>
+            </div>
+        </header>
+
+        <section class="bg-gray-800 p-6 rounded-lg border border-gray-700 overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead><tr id="table-head" class="text-xs text-gray-400 border-b border-gray-700"></tr></thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </section>
+    </div>
+
+    <!-- MODALE CENTRALE : PARC MACHINES & PLAFONDS -->
+    <div id="parcModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[100] hidden">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg w-11/12 max-w-5xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h2 class="text-lg font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">⚙️ Gestion du Parc Machines & Plafonds</h2>
+                <button onclick="closeParcModal()" class="text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
+            </div>
+            
+            <div class="p-6 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
+                <div class="bg-gray-900/80 p-4 rounded-lg border border-gray-700">
+                    <h3 class="text-sm font-bold text-blue-400 mb-3 uppercase">Plafonds Hebdomadaires & Ratio FH</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                        <div>
+                            <label class="block text-gray-400 mb-1 font-bold">Heures de Vol Max / Machine / Semaine :</label>
+                            <input type="number" step="0.1" id="parc-cfg-vol" class="bg-gray-800 border border-gray-600 rounded p-2 text-white font-bold w-full" onchange="saveParcConstraints()">
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 mb-1 font-bold">Rotations Max / Machine / Semaine :</label>
+                            <input type="number" id="parc-cfg-rot" class="bg-gray-800 border border-gray-600 rounded p-2 text-white font-bold w-full" onchange="saveParcConstraints()">
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 mb-1 font-bold">Ratio FH (Heures Mécanique / Pilote) :</label>
+                            <input type="number" step="0.01" min="0" max="5" id="parc-cfg-ratio-fh" class="bg-gray-800 border border-gray-600 rounded p-2 text-emerald-400 font-bold w-full" onchange="saveParcConstraints()" title="Multiplicateur appliqué aux Heures Pilote (ex: 0.9 = 90% des heures pilote)">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-900/80 p-4 rounded-lg border border-gray-700">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-sm font-bold text-amber-400 uppercase">Flotte d'Aéronefs Enregistrés</h3>
+                        <button onclick="addNewMachineToParc()" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded text-xs font-bold shadow">+ Ajouter un Aéronef</button>
+                    </div>
+                    <table class="w-full text-xs text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-gray-700 text-gray-400">
+                                <th class="p-2">Numéro de Série (SN)</th>
+                                <th class="p-2">Indicatif OACI</th>
+                                <th class="p-2">Année Livraison</th>
+                                <th class="p-2">Semaine Livraison</th>
+                                <th class="p-2 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="parc-machines-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-700 flex justify-end">
+                <button onclick="closeParcModal()" class="bg-amber-600 hover:bg-amber-500 text-white px-6 py-2 rounded font-semibold text-sm shadow transition">
+                    Valider & Fermer
+                </button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let machines = JSON.parse(localStorage.getItem('caf_parc_machines') || '[]');
+    let currentYear = 2026;
+
+    function renderTable() {
+        const head = document.getElementById('table-head');
+        const body = document.getElementById('table-body');
+        head.innerHTML = '<th class="p-2">Machine (SN / OACI)</th>';
+        for(let i=1; i<=52; i++) head.innerHTML += `<th class="p-1 text-[10px] w-4">S${i}</th>`;
+
+        body.innerHTML = '';
+        machines.forEach((m, idx) => {
+            let row = `<tr class="border-b border-gray-700">
+                <td class="p-2 bg-gray-900/50">
+                    <div class="font-bold text-sm text-white">${m.numero}</div>
+                    <div class="text-xs text-emerald-400 font-mono">${m.indicatif}</div>
+                </td>`;
+            for(let s=1; s<=52; s++) {
+                let status = getStatus(m, s);
+                row += `<td class="p-1">
+                    <div class="w-4 h-4 rounded-sm ${status}"></div>
+                </td>`;
+            }
+            body.innerHTML += row + '</tr>';
+        });
+    }
+
+    function getStatus(m, s) {
+        if (currentYear < m.annee || (currentYear === m.annee && s < m.semaine)) return 'bg-gray-700';
+        if (m.indispos && m.indispos.some(i => currentYear === i.debut.annee && s >= i.debut.semaine && s <= i.fin.semaine)) return 'bg-red-600';
+        return 'bg-emerald-600';
+    }
+
+    function openIndispoModal(mIdx, s) {
+        document.getElementById('indispo-idx').value = mIdx;
+        document.getElementById('indispo-semaine').value = s;
+        document.getElementById('indispo-fin').value = s;
+        document.getElementById('indispo-modal').classList.remove('hidden');
+    }
+
+    function saveIndispo() {
+        const mIdx = document.getElementById('indispo-idx').value;
+        const debut = parseInt(document.getElementById('indispo-semaine').value);
+        const fin = parseInt(document.getElementById('indispo-fin').value);
+        const motif = document.getElementById('indispo-motif').value;
+        if(!machines[mIdx].indispos) machines[mIdx].indispos = [];
+        machines[mIdx].indispos.push({ debut: {annee: currentYear, semaine: debut}, fin: {annee: currentYear, semaine: fin}, motif });
+        localStorage.setItem('caf_parc_machines', JSON.stringify(machines)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('parc');
+        window.dispatchEvent(new Event('storage')); // Signal ajouté
+        closeIndispoModal(); renderTable();
+    }
+
+    function toggleDispo(mIdx, s) {
+        const machine = machines[mIdx];
+        if (!machine.indispos) machine.indispos = [];
+        const index = machine.indispos.findIndex(i => currentYear === i.debut.annee && s >= i.debut.semaine && s <= i.fin.semaine);
+        if (index !== -1) { machine.indispos.splice(index, 1); } 
+        else { machine.indispos.push({ debut: {annee: currentYear, semaine: s}, fin: {annee: currentYear, semaine: s}, motif: "Indispo ponctuelle" }); }
+        localStorage.setItem('caf_parc_machines', JSON.stringify(machines)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('parc');
+        window.dispatchEvent(new Event('storage')); // Signal ajouté
+        renderTable();
+    }
+
+    function saveMachine() {
+        const idx = document.getElementById('edit-idx').value;
+        const data = { numero: document.getElementById('modal-numero').value, indicatif: document.getElementById('modal-indicatif').value, annee: parseInt(document.getElementById('modal-annee').value), semaine: parseInt(document.getElementById('modal-semaine').value) };
+        if (idx === "") machines.push(data); else machines[idx] = data;
+        localStorage.setItem('caf_parc_machines', JSON.stringify(machines)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('parc');
+        window.dispatchEvent(new Event('storage')); // Signal ajouté
+        closeModal(); renderTable();
+    }
+
+    function saveConstraints() {
+        const constraints = {
+            vol: parseFloat(document.getElementById('cfg-vol').value),
+            rot: parseInt(document.getElementById('cfg-rot').value)
+        };
+        localStorage.setItem('caf_constraints', JSON.stringify(constraints)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('parc');
+        window.dispatchEvent(new Event('storage')); // Signal ajouté
+        closeConstraintModal();
+        alert("Plafonds mis à jour");
+    }
+function toggleDispo(mIdx, s) {
+    const machine = machines[mIdx];
+    if (!machine.indispos) machine.indispos = [];
+    
+    // Vérifie si cette semaine spécifique est déjà dans une période d'indispo
+    const index = machine.indispos.findIndex(i => 
+        currentYear === i.debut.annee && s >= i.debut.semaine && s <= i.fin.semaine
+    );
+    
+    if (index !== -1) {
+        // Si elle est rouge, on supprime cette période pour la remettre dispo
+        machine.indispos.splice(index, 1);
+    } else {
+        // Sinon, on passe en rouge (indispo d'une semaine)
+        machine.indispos.push({ 
+            debut: {annee: currentYear, semaine: s}, 
+            fin: {annee: currentYear, semaine: s}, 
+            motif: "Indispo ponctuelle" 
+        });
+    }
+    
+    localStorage.setItem('caf_parc_machines', JSON.stringify(machines)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('parc');
+    renderTable();
+}
+    function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+    function closeIndispoModal() { document.getElementById('indispo-modal').classList.add('hidden'); }
+    
+    // Reste des fonctions (openModal, saveMachine, deleteMachine...) identiques
+    function changeYear(y) { currentYear = parseInt(y); document.getElementById('display-year').innerText = y; renderTable(); }
+    function openModal(idx = null) {
+        document.getElementById('edit-idx').value = idx;
+        const [annee, semaine] = [document.getElementById('modal-annee'), document.getElementById('modal-semaine')];
+        if (idx !== null) {
+            document.getElementById('modal-numero').value = machines[idx].numero;
+            document.getElementById('modal-indicatif').value = machines[idx].indicatif;
+            annee.value = machines[idx].annee; semaine.value = machines[idx].semaine;
+            annee.readOnly = true; semaine.readOnly = true;
+        } else {
+            document.getElementById('modal-numero').value = ''; document.getElementById('modal-indicatif').value = '';
+            annee.value = currentYear; semaine.value = 1;
+            annee.readOnly = false; semaine.readOnly = false;
+        }
+        document.getElementById('modal').classList.remove('hidden');
+    }
+
+    function saveMachine() {
+        const idx = document.getElementById('edit-idx').value;
+        const data = { numero: document.getElementById('modal-numero').value, indicatif: document.getElementById('modal-indicatif').value, annee: parseInt(document.getElementById('modal-annee').value), semaine: parseInt(document.getElementById('modal-semaine').value) };
+        if (idx === "") machines.push(data); else machines[idx] = data;
+        localStorage.setItem('caf_parc_machines', JSON.stringify(machines)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('parc');
+        closeModal(); renderTable();
+    }
+
+    function deleteMachine() {
+        const idx = document.getElementById('edit-idx').value;
+        if(idx !== "" && confirm("Supprimer cette machine ?")) { machines.splice(idx, 1); localStorage.setItem('caf_parc_machines', JSON.stringify(machines)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('parc'); closeModal(); renderTable(); }
+    }
+// --- GESTION DU PARC MACHINES & RATIO FH ---
+function openParcModal() {
+    try {
+        let cfgStr = localStorage.getItem('caf_constraints');
+        let cfg = {};
+        if (cfgStr) {
+            try { cfg = JSON.parse(cfgStr); } catch(e) { cfg = {}; }
+        }
+        if (typeof cfg !== 'object' || cfg === null) cfg = {};
+
+        const volInput = document.getElementById('parc-cfg-vol');
+        const rotInput = document.getElementById('parc-cfg-rot');
+        const ratioInput = document.getElementById('parc-cfg-ratio-fh');
+
+        if (volInput) volInput.value = cfg.volMax !== undefined ? cfg.volMax : (cfg.maxVolHebdo !== undefined ? cfg.maxVolHebdo : (cfg.vol !== undefined ? cfg.vol : 10));
+        if (rotInput) rotInput.value = cfg.rotMax !== undefined ? cfg.rotMax : (cfg.maxRotationsHebdo !== undefined ? cfg.maxRotationsHebdo : (cfg.rot !== undefined ? cfg.rot : 5));
+        if (ratioInput) ratioInput.value = cfg.ratioFH !== undefined ? cfg.ratioFH : 0.9;
+        
+        renderParcMachinesList();
+    } catch(err) {
+        console.error("Erreur ouverture parc modal:", err);
+    }
+    const modal = document.getElementById('parcModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeParcModal() {
+    const modal = document.getElementById('parcModal');
+    if (modal) modal.classList.add('hidden');
+    machines = JSON.parse(localStorage.getItem('caf_parc_machines') || '[]');
+    renderTable();
+    window.dispatchEvent(new Event('storage'));
+}
+
+function saveParcConstraints() {
+    let vInput = document.getElementById('parc-cfg-vol');
+    let rInput = document.getElementById('parc-cfg-rot');
+    let ratioInput = document.getElementById('parc-cfg-ratio-fh');
+    
+    let vMax = vInput ? parseFloat(vInput.value) || 10 : 10;
+    let rMax = rInput ? parseInt(rInput.value) || 5 : 5;
+    let ratio = ratioInput ? parseFloat(ratioInput.value) : 0.9;
+    if (isNaN(ratio)) ratio = 0.9;
+    
+    let oldCfg = {};
+    try { oldCfg = JSON.parse(localStorage.getItem('caf_constraints') || '{}'); } catch(e) {}
+    let newCfg = {
+        ...oldCfg,
+        volMax: vMax,
+        rotMax: rMax,
+        vol: oldCfg.vol || vMax,
+        rot: oldCfg.rot || rMax,
+        ratioFH: ratio
+    };
+    localStorage.setItem('caf_constraints', JSON.stringify(newCfg)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('parc');
+    renderTable();
+    window.dispatchEvent(new Event('storage'));
+}
+
+function renderParcMachinesList() {
+    let mList = [];
+    try {
+        let raw = localStorage.getItem('caf_parc_machines');
+        if (raw) mList = JSON.parse(raw);
+    } catch(e) { mList = []; }
+    if (!Array.isArray(mList)) mList = [];
+
+    let tbody = document.getElementById('parc-machines-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    mList.forEach((m, idx) => {
+        const num = (m && m.numero !== undefined) ? m.numero : '';
+        const ind = (m && m.indicatif !== undefined) ? m.indicatif : '';
+        const ann = (m && m.annee !== undefined) ? m.annee : 2026;
+        const sem = (m && m.semaine !== undefined) ? m.semaine : 1;
+        tbody.innerHTML += `
+            <tr class="border-b border-gray-700/50 hover:bg-gray-700/50">
+                <td class="p-2 font-bold text-white"><input type="text" value="${num}" onchange="updateMachineField(${idx}, 'numero', this.value)" class="bg-gray-900 border border-gray-600 rounded p-1 text-xs w-full"></td>
+                <td class="p-2 font-bold text-emerald-400 font-mono"><input type="text" value="${ind}" onchange="updateMachineField(${idx}, 'indicatif', this.value)" class="bg-gray-900 border border-gray-600 rounded p-1 text-xs w-full"></td>
+                <td class="p-2"><input type="number" value="${ann}" onchange="updateMachineField(${idx}, 'annee', this.value)" class="bg-gray-900 border border-gray-600 rounded p-1 text-xs w-20 text-center"></td>
+                <td class="p-2"><input type="number" value="${sem}" onchange="updateMachineField(${idx}, 'semaine', this.value)" class="bg-gray-900 border border-gray-600 rounded p-1 text-xs w-16 text-center"></td>
+                <td class="p-2 text-right"><button onclick="deleteMachineCentral(${idx})" class="text-red-400 hover:text-red-300 font-bold text-xs">Supprimer</button></td>
+            </tr>
+        `;
+    });
+}
+
+function updateMachineField(idx, field, val) {
+    let mList = JSON.parse(localStorage.getItem('caf_parc_machines') || '[]');
+    if (mList[idx]) {
+        mList[idx][field] = (field === 'annee' || field === 'semaine') ? parseInt(val) || 2026 : val;
+        localStorage.setItem('caf_parc_machines', JSON.stringify(mList)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('parc');
+        machines = mList;
+        renderTable();
+        window.dispatchEvent(new Event('storage'));
+    }
+}
+
+function addNewMachineToParc() {
+    let mList = JSON.parse(localStorage.getItem('caf_parc_machines') || '[]');
+    mList.push({ numero: `EC-135-${mList.length + 1}`, indicatif: `F-HB${10 + mList.length}`, annee: 2026, semaine: 1, indispos: [] });
+    localStorage.setItem('caf_parc_machines', JSON.stringify(mList)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('parc');
+    machines = mList;
+    renderParcMachinesList();
+    renderTable();
+    window.dispatchEvent(new Event('storage'));
+}
+
+function deleteMachineCentral(idx) {
+    let mList = JSON.parse(localStorage.getItem('caf_parc_machines') || '[]');
+    if (confirm("Supprimer cette machine ?")) {
+        mList.splice(idx, 1);
+        localStorage.setItem('caf_parc_machines', JSON.stringify(mList)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('parc');
+        machines = mList;
+        renderParcMachinesList();
+        renderTable();
+        window.dispatchEvent(new Event('storage'));
+    }
+}
+    function initSatelliteAuth() {
+        const uStr = localStorage.getItem('caf_current_user') || sessionStorage.getItem('caf_current_user');
+        if (!uStr) {
+            alert("Accès refusé. Vous devez d'abord vous connecter sur la page PLANNING.");
+            window.location.href = 'Planning.html';
+            return;
+        }
+        const user = JSON.parse(uStr);
+        if (user.role === 'invite') {
+            alert("Accès réservé. Les invités n'ont accès qu'à la page Planning.");
+            window.location.href = 'Planning.html';
+            return;
+        }
+        const badge = document.getElementById('navUserBadge');
+        if (badge) {
+            let roleBadge = user.role === 'admin' 
+                ? '<span class="bg-red-900/80 text-red-300 text-[10px] font-black px-2 py-0.5 rounded border border-red-700">🔴 Admin</span>'
+                : user.role === 'planificateur'
+                ? '<span class="bg-blue-900/80 text-blue-300 text-[10px] font-black px-2 py-0.5 rounded border border-blue-700">🟡 Planif</span>'
+                : '<span class="bg-emerald-900/80 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded border border-emerald-700">🟢 Invité</span>';
+            badge.innerHTML = `<span class="text-white font-bold">👤 ${user.name}</span> ${roleBadge} <button onclick="localStorage.removeItem('caf_current_user'); sessionStorage.removeItem('caf_current_user'); window.location.href='Planning.html';" class="text-gray-400 hover:text-red-400 ml-2 font-bold" title="Déconnexion">🚪</button>`;
+        }
+        
+        // Hide Flux link if not Guepard
+        const activeBrigade = localStorage.getItem('caf_active_brigade') || 'brg_guepard';
+        if (activeBrigade !== 'brg_guepard') {
+            document.querySelectorAll('a[href="Flux.html"]').forEach(l => l.style.display = 'none');
+        }
+        
+        if (user.role === 'invite') {
+            const btn1 = document.getElementById('btnPlafonds');
+            const btn2 = document.getElementById('btnAddMachine');
+            if (btn1) btn1.classList.add('hidden');
+            if (btn2) btn2.classList.add('hidden');
+        }
+    }
+
+    async function startSatellitePage() {
+        try { await window.initSQLite(); } catch(e) {}
+        initSatelliteAuth();
+        if (typeof renderTable === 'function') renderTable();
+    }
+    startSatellitePage();
+</script>
+
+    <!-- BADGE CRÉATEUR & VERSION -->
+    <div class="fixed bottom-2 right-3 text-[10px] text-gray-400 font-semibold pointer-events-none z-40 bg-gray-900/80 backdrop-blur px-2.5 py-1 rounded border border-gray-800 shadow flex items-center gap-2">
+        <span>Créateur : <b class="text-gray-200">CDT CORNET Guillaume</b></span>
+        <span class="text-emerald-400 font-mono font-bold border-l border-gray-700 pl-2">v1.4 BETA</span>
+    </div>
+</body>
+</html>

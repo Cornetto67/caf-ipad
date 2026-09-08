@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestion RH - CAF numérique NG v1.4 BETA</title>
+    <script src="libs/tailwindcss.js"></script>
+    <script src="libs/sql-wasm.js"></script>
+    <script src="libs/sql-wasm-b64.js"></script>
+    <script src="sqlite-engine.js?v=1.4.1"></script>
+</head><body class="bg-gray-900 text-gray-100 p-6 min-h-screen font-sans">
+
+    <!-- NAV BANNER -->
+    <header class="relative z-[100] bg-gray-800 border border-gray-700 p-3 mb-6 flex flex-wrap justify-between items-center gap-3 rounded-lg shadow-lg">
+        <div class="flex items-center gap-3 flex-wrap">
+            <span class="text-lg font-black text-emerald-400">🛸 CAF numérique NG</span>
+            <div class="relative group" id="unifiedMenuContainer" onmouseenter="document.getElementById('unifiedMenu').classList.remove('hidden')" onmouseleave="document.getElementById('unifiedMenu').classList.add('hidden')">
+                <button class="flex flex-col justify-center items-center gap-1 p-2 rounded hover:bg-gray-700 transition focus:outline-none bg-gray-900/80 border border-gray-700">
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                    <span class="block w-5 h-0.5 bg-gray-300"></span>
+                </button>
+                <div id="unifiedMenu" class="hidden absolute left-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-2 space-y-1 text-xs font-semibold">
+                    <div class="text-[10px] uppercase text-gray-500 font-bold mb-1 border-b border-gray-700 pb-1 px-2">Navigation</div>
+                    <a href="Planning.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">🚀 Planning</a>
+                    <a href="Synthèse.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">📊 Synthèse</a>
+                    <a href="Flux.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">🔄 Flux GPEEC</a>
+                    <a href="Parc.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">🚁 Parc</a>
+                    <a href="RH.html" class="block w-full text-left px-3 py-2 rounded text-white shadow font-extrabold bg-purple-600 flex items-center gap-2">👨‍🏫 RH Formateurs</a>
+                    <a href="conduite.html" class="block w-full text-left px-3 py-2 rounded text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2">📅 Conduite</a>
+                </div>
+            </div>
+        <div class="flex items-center gap-3 ml-auto">
+            <button id="btnOpenRHEditor" onclick="openRHModal()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold px-3 py-1.5 rounded text-xs shadow flex items-center gap-1.5 transition">
+                👥 Config RH Formateurs
+            </button>
+            <div id="navUserBadge" class="flex items-center gap-2 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-1 text-xs">
+            </div>
+        </div>
+    </header>
+
+    <!-- MODALE CENTRALE : RH FORMATEURS -->
+    <div id="rhModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[100] hidden">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg w-11/12 max-w-5xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h2 class="text-lg font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">👥 Configuration des RH Formateurs</h2>
+                <button onclick="closeRHModal()" class="text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1 custom-scrollbar">
+                <table class="w-full text-xs text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-gray-700 text-gray-400">
+                            <th class="p-2">Nom Formateur</th>
+                            <th class="p-2">Grade</th>
+                            <th class="p-2 text-center">PIL</th>
+                            <th class="p-2 text-center">MO</th>
+                            <th class="p-2 text-center">Tactique</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rh-editor-body"></tbody>
+                </table>
+            </div>
+
+            <div class="p-4 border-t border-gray-700 flex justify-between items-center">
+                <button onclick="addNewRHCentral()" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded font-semibold text-xs shadow">+ Ajouter Formateur</button>
+                <button onclick="closeRHModal()" class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded font-semibold text-sm shadow">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="relative z-[100] flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-gray-700 pb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-emerald-400">👥 Gestion du Pool Formateurs</h1>
+            <p class="text-xs text-gray-400 mt-1">Affectation et suivi des qualifications (Capacité max : 17)</p>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-gray-800 border border-gray-700 p-4 rounded-lg text-center shadow-lg">
+            <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Qualifiés (Issus TRI)</div>
+            <div class="text-3xl font-black text-emerald-400" id="count-unlocked">0</div>
+        </div>
+        <div class="bg-gray-800 border border-emerald-900/50 p-4 rounded-lg text-center shadow-lg">
+            <div class="text-[10px] text-emerald-500 uppercase font-bold tracking-wider mb-1">Cours Technique</div>
+            <div class="text-3xl font-black text-emerald-300" id="count-tech">0</div>
+        </div>
+        <div class="bg-gray-800 border border-indigo-900/50 p-4 rounded-lg text-center shadow-lg">
+            <div class="text-[10px] text-indigo-400 uppercase font-bold tracking-wider mb-1">Cours Tactique</div>
+            <div class="text-3xl font-black text-indigo-300" id="count-tac">0</div>
+        </div>
+        <div class="bg-gray-800 border border-purple-900/50 p-4 rounded-lg text-center shadow-lg">
+            <div class="text-[10px] text-purple-400 uppercase font-bold tracking-wider mb-1">Double Qualif (Mixte)</div>
+            <div class="text-3xl font-black text-purple-300" id="count-mixte">0</div>
+        </div>
+    </div>
+
+    <div id="rh-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        </div>
+
+<script>
+    const MAX_INSTRUCTORS = 17;
+
+    function loadAndProcessRH() {
+        const stages = JSON.parse(localStorage.getItem('caf_stages_v3') || '[]');
+        let rhData = JSON.parse(localStorage.getItem('caf_rh_v3') || '[]');
+
+        // 1. Initialiser la base RH si vide
+        if (rhData.length === 0) {
+            for (let i = 1; i <= MAX_INSTRUCTORS; i++) {
+                rhData.push({ id: i, name: `Instructeur ${i}`, role: 'technique' });
+            }
+        }
+
+        // 2. Calculer combien de formateurs sont débloqués par les stages TRI
+        let unlockedCount = 0;
+        stages.forEach(s => {
+            const isTRI = s.formType === 'MO_TRI' || (s.customName && s.customName.toUpperCase().includes('TRI'));
+            if (isTRI) {
+                unlockedCount += (parseInt(s.count_ecole) || 0);
+            }
+        });
+        
+        // Plafonner à 17 maximum
+        unlockedCount = Math.min(unlockedCount, MAX_INSTRUCTORS);
+
+        // 3. Compteurs pour le dashboard
+        let countTech = 0, countTac = 0, countMixte = 0;
+
+        // 4. Générer l'affichage
+        const grid = document.getElementById('rh-grid');
+        grid.innerHTML = '';
+
+        rhData.forEach((formateur, index) => {
+            const isUnlocked = index < unlockedCount;
+            
+            if (isUnlocked) {
+                if (formateur.role === 'technique') countTech++;
+                else if (formateur.role === 'tactique') countTac++;
+                else if (formateur.role === 'mixte') countMixte++;
+            }
+
+            const card = document.createElement('div');
+            card.className = `p-4 rounded-lg border shadow-md relative overflow-hidden transition ${
+                isUnlocked 
+                ? 'bg-gray-800 border-gray-600 hover:border-emerald-500' 
+                : 'bg-gray-900/50 border-gray-800 opacity-60 grayscale'
+            }`;
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <span class="text-xs font-black text-gray-500 bg-gray-900 px-2 py-1 rounded">SLOT ${formateur.id}</span>
+                    ${isUnlocked 
+                        ? `<span class="text-[10px] font-bold px-2 py-1 rounded bg-emerald-900/50 text-emerald-400">ACTIF</span>` 
+                        : `<span class="text-[10px] font-bold px-2 py-1 rounded bg-gray-800 text-gray-500">EN ATTENTE TRI</span>`
+                    }
+                </div>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nom / Trigramme</label>
+                        <div class="w-full bg-gray-900/80 border border-gray-700 rounded p-1.5 text-sm font-bold text-white">
+                            ${formateur.name || 'Instructeur ' + formateur.id}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Affectation</label>
+                        <div class="w-full bg-gray-900/80 border border-gray-700 rounded p-1.5 text-xs font-bold text-gray-200">
+                            ${formateur.role === 'technique' ? '🔬 Cours Technique' : formateur.role === 'tactique' ? '⚔️ Cours Tactique' : '🔄 Double Qualif (Mixte)'}
+                        </div>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+
+        // 5. Mettre à jour les compteurs
+        document.getElementById('count-unlocked').innerText = `${unlockedCount} / ${MAX_INSTRUCTORS}`;
+        document.getElementById('count-tech').innerText = countTech;
+        document.getElementById('count-tac').innerText = countTac;
+        document.getElementById('count-mixte').innerText = countMixte;
+    }
+
+    function updateFormateur(index, field, value) {
+        let rhData = JSON.parse(localStorage.getItem('caf_rh_v3') || '[]');
+        if (rhData[index]) {
+            rhData[index][field] = value;
+            localStorage.setItem('caf_rh_v3', JSON.stringify(rhData)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('rh');
+            loadAndProcessRH(); // Recharger pour maj les compteurs
+            
+            // On déclenche un event pour que la synthèse se mette à jour si elle est ouverte à côté
+            window.dispatchEvent(new Event('storage'));
+        }
+    }
+
+    function openRHModal() {
+        renderRHEditorCentral();
+        const modal = document.getElementById('rhModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+        }
+    }
+    function closeRHModal() {
+        const modal = document.getElementById('rhModal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
+        }
+        loadAndProcessRH();
+        window.dispatchEvent(new Event('storage'));
+    }
+    function renderRHEditorCentral() {
+        let rhData = JSON.parse(localStorage.getItem('caf_rh_v3') || '[]');
+        let tbody = document.getElementById('rh-editor-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        rhData.forEach((r, idx) => {
+            tbody.innerHTML += `
+                <tr class="border-b border-gray-700/50 hover:bg-gray-700/50">
+                    <td class="p-2 font-bold text-white"><input type="text" value="${r.name || ''}" onchange="updateRHFieldCentral(${idx}, 'name', this.value)" class="bg-gray-900 border border-gray-600 rounded p-1 text-xs w-full"></td>
+                    <td class="p-2"><input type="text" value="${r.grade || ''}" onchange="updateRHFieldCentral(${idx}, 'grade', this.value)" class="bg-gray-900 border border-gray-600 rounded p-1 text-xs w-full"></td>
+                    <td class="p-2 text-center"><input type="checkbox" ${r.pil ? 'checked' : ''} onchange="updateRHFieldCentral(${idx}, 'pil', this.checked)"></td>
+                    <td class="p-2 text-center"><input type="checkbox" ${r.mo ? 'checked' : ''} onchange="updateRHFieldCentral(${idx}, 'mo', this.checked)"></td>
+                    <td class="p-2 text-center"><input type="checkbox" ${r.tactique ? 'checked' : ''} onchange="updateRHFieldCentral(${idx}, 'tactique', this.checked)"></td>
+                </tr>
+            `;
+        });
+    }
+    function updateRHFieldCentral(idx, field, val) {
+        let rhData = JSON.parse(localStorage.getItem('caf_rh_v3') || '[]');
+        if (rhData[idx]) {
+            rhData[idx][field] = val;
+            localStorage.setItem('caf_rh_v3', JSON.stringify(rhData)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('rh');
+            loadAndProcessRH();
+            window.dispatchEvent(new Event('storage'));
+        }
+    }
+    function addNewRHCentral() {
+        let rhData = JSON.parse(localStorage.getItem('caf_rh_v3') || '[]');
+        rhData.push({ id: rhData.length + 1, name: `Instructeur ${rhData.length + 1}`, grade: 'CNE', pil: true, mo: false, tactique: false });
+        localStorage.setItem('caf_rh_v3', JSON.stringify(rhData)); if (window.syncSatelliteToSQLite) window.syncSatelliteToSQLite('rh');
+        renderRHEditorCentral();
+        loadAndProcessRH();
+        window.dispatchEvent(new Event('storage'));
+    }
+
+    function initSatelliteAuth() {
+        const uStr = localStorage.getItem('caf_current_user') || sessionStorage.getItem('caf_current_user');
+        if (!uStr) {
+            alert("Accès refusé. Vous devez d'abord vous connecter sur la page PLANNING.");
+            window.location.href = 'Planning.html';
+            return;
+        }
+        const user = JSON.parse(uStr);
+        if (user.role === 'invite') {
+            alert("Accès réservé. Les invités n'ont accès qu'à la page Planning.");
+            window.location.href = 'Planning.html';
+            return;
+        }
+        const badge = document.getElementById('navUserBadge');
+        if (badge) {
+            let roleBadge = user.role === 'admin' 
+                ? '<span class="bg-red-900/80 text-red-300 text-[10px] font-black px-2 py-0.5 rounded border border-red-700">🔴 Admin</span>'
+                : user.role === 'planificateur'
+                ? '<span class="bg-blue-900/80 text-blue-300 text-[10px] font-black px-2 py-0.5 rounded border border-blue-700">🟡 Planif</span>'
+                : '<span class="bg-emerald-900/80 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded border border-emerald-700">🟢 Invité</span>';
+            badge.innerHTML = `<span class="text-white font-bold">👤 ${user.name}</span> ${roleBadge} <button onclick="localStorage.removeItem('caf_current_user'); sessionStorage.removeItem('caf_current_user'); window.location.href='Planning.html';" class="text-gray-400 hover:text-red-400 ml-2 font-bold" title="Déconnexion">🚪</button>`;
+        }
+        
+        // Hide Flux link if not Guepard
+        const activeBrigade = localStorage.getItem('caf_active_brigade') || 'brg_guepard';
+        if (activeBrigade !== 'brg_guepard') {
+            document.querySelectorAll('a[href="Flux.html"]').forEach(l => l.style.display = 'none');
+        }
+    }
+
+    async function startSatellitePage() {
+        try { await window.initSQLite(); } catch(e) {}
+        initSatelliteAuth();
+        window.addEventListener('storage', loadAndProcessRH);
+        loadAndProcessRH();
+    }
+    startSatellitePage();
+</script>
+
+    <!-- BADGE CRÉATEUR & VERSION -->
+    <div class="fixed bottom-2 right-3 text-[10px] text-gray-400 font-semibold pointer-events-none z-40 bg-gray-900/80 backdrop-blur px-2.5 py-1 rounded border border-gray-800 shadow flex items-center gap-2">
+        <span>Créateur : <b class="text-gray-200">CDT CORNET Guillaume</b></span>
+        <span class="text-emerald-400 font-mono font-bold border-l border-gray-700 pl-2">v1.4 BETA</span>
+    </div>
+</body>
+</html>
