@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -63,7 +63,7 @@
     <script src="libs/jspdf-autotable.js"></script>
     <script src="libs/sql-wasm.js"></script>
     <script src="libs/sql-wasm-b64.js"></script>
-    <script src="sqlite-engine.js?v=1.4.1"></script>
+    <script src="sqlite-engine.js?v=1.4.2"></script>
     
     <style>        
         .timeline-grid {
@@ -249,6 +249,9 @@
                     <button onclick="performSilentNetworkRefresh()" class="text-xs bg-gray-800 hover:bg-gray-700 text-emerald-400 border border-emerald-700/60 px-2 py-1 rounded transition font-bold flex items-center gap-1 shadow" title="Actualiser manuellement la base de données SQLite">
                         🔄 Actualiser
                     </button>
+                    <button onclick="addMarker()" class="text-xs bg-yellow-900/80 hover:bg-yellow-800 text-yellow-300 border border-yellow-700/60 px-2 py-1 rounded transition font-bold flex items-center gap-1 shadow" title="Ajouter un repère visuel flottant sur le planning">
+                        ✨ Ajouter Repère
+                    </button>
                     <span id="autoSyncToast" class="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-700/60 px-2 py-0.5 rounded opacity-0 transition-opacity duration-500"></span>
                 </h1>
             </div>
@@ -301,6 +304,81 @@
         </div>
     </main>
     
+    <!-- MODALE REPÈRE VISUEL -->
+    <div id="markerModal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg max-w-sm w-full p-5 shadow-2xl">
+            <h3 class="text-base font-bold text-yellow-400 mb-3 flex items-center gap-2">✨ Éditer le Repère</h3>
+            <input type="hidden" id="markerId">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">Texte</label>
+                    <input type="text" id="markerText" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:border-yellow-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Forme</label>
+                        <select id="markerShape" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:border-yellow-500 outline-none">
+                            <option value="rectangle">Rectangle</option>
+                            <option value="ellipse">Ellipse / Cercle</option>
+                            <option value="triangle">Triangle</option>
+                            <option value="diamond">Losange</option>
+                            <option value="parallelogram">Parallélogramme</option>
+                            <option value="hexagon">Hexagone</option>
+                            <option value="star">Étoile</option>
+                            <option value="cross">Croix</option>
+                            <option value="arrowRight">Flèche Droite</option>
+                            <option value="arrowLeft">Flèche Gauche</option>
+                            <option value="arrowUp">Flèche Haut</option>
+                            <option value="arrowDown">Flèche Bas</option>
+                            <option value="cylinder">Cylindre / BDD</option>
+                            <option value="bubble">Bulle</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Couleur</label>
+                        <select id="markerColor" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:border-yellow-500 outline-none">
+                            <!-- Fonds pleins -->
+                            <option value="bg-yellow-500">Jaune (Plein)</option>
+                            <option value="bg-red-500">Rouge (Plein)</option>
+                            <option value="bg-blue-500">Bleu (Plein)</option>
+                            <option value="bg-emerald-500">Vert (Plein)</option>
+                            <option value="bg-purple-500">Violet (Plein)</option>
+                            <option value="bg-gray-500">Gris (Plein)</option>
+                            <option value="bg-pink-500">Rose (Plein)</option>
+                            <option value="bg-white">Blanc (Plein)</option>
+                            <!-- Contours vides -->
+                            <option value="bg-transparent border-2 border-yellow-500 text-yellow-500">Contour Jaune (Vide)</option>
+                            <option value="bg-transparent border-2 border-red-500 text-red-500">Contour Rouge (Vide)</option>
+                            <option value="bg-transparent border-2 border-blue-500 text-blue-500">Contour Bleu (Vide)</option>
+                            <option value="bg-transparent border-2 border-emerald-500 text-emerald-500">Contour Vert (Vide)</option>
+                            <option value="bg-transparent border-2 border-purple-500 text-purple-500">Contour Violet (Vide)</option>
+                            <option value="bg-transparent border-2 border-gray-500 text-gray-500">Contour Gris (Vide)</option>
+                            <option value="bg-transparent border-2 border-pink-500 text-pink-500">Contour Rose (Vide)</option>
+                            <option value="bg-transparent border-2 border-white text-white">Contour Blanc (Vide)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mt-2">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Largeur (px)</label>
+                        <input type="number" id="markerWidth" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:border-yellow-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Hauteur (px)</label>
+                        <input type="number" id="markerHeight" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:border-yellow-500 outline-none">
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center mt-5 pt-3 border-t border-gray-700">
+                <button onclick="deleteMarker()" class="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1">🗑️ Supprimer</button>
+                <div class="flex gap-2">
+                    <button onclick="closeMarkerModal()" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1.5 rounded text-xs font-semibold">Annuler</button>
+                    <button onclick="saveMarker()" class="bg-yellow-600 hover:bg-yellow-500 text-black px-4 py-1.5 rounded text-xs font-bold">Enregistrer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="exportModal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 hidden">
         <div class="bg-gray-800 border border-gray-700 rounded-lg max-w-sm w-full p-5 shadow-2xl">
             <h3 class="text-base font-bold text-gray-100 mb-3">Sélectionner les années à exporter</h3>
@@ -1106,6 +1184,7 @@
 
         let templates = JSON.parse(localStorage.getItem('caf_templates_v3')) || defaultTemplates;
         let stages = JSON.parse(localStorage.getItem('caf_stages_v3')) || [];
+        let visualMarkers = JSON.parse(localStorage.getItem('caf_markers_v3')) || [];
         let offWeeksMulti = JSON.parse(localStorage.getItem('caf_off_weeks_multi_v3')) || {};
         let yearsList = JSON.parse(localStorage.getItem('caf_years_list_v3')) || [currentRealYear, currentRealYear + 1];
         let currentSelectedYear = yearsList[0];
@@ -1132,182 +1211,18 @@
         // --- SYSTÈME D'AUTHENTIFICATION ET DE GESTION DES UTILISATEURS ---
         const USERS_STORAGE_KEY = 'caf_users_v1';
         const CURRENT_USER_KEY = 'caf_current_user';
-
-        const DEFAULT_USERS = [
-            { id: 'usr_admin', username: 'admin', password: 'admin123', name: 'Administrateur Système', role: 'admin', brigadeId: 'ALL', createdAt: '2026-07-23' },
-            { id: 'usr_cmd', username: 'cmd', password: 'invite123', name: 'Supervision Commandement', role: 'super_invite', brigadeId: 'ALL', createdAt: '2026-07-28' },
-            { id: 'usr_planif', username: 'planif', password: 'planif123', name: 'Planificateur GUÉPARD', role: 'planificateur', brigadeId: 'brg_guepard', createdAt: '2026-07-23' },
-            { id: 'usr_invite', username: 'invite', password: 'invite123', name: 'Invité GUÉPARD', role: 'invite', brigadeId: 'brg_guepard', createdAt: '2026-07-23' }
-        ];
-
-        function getUsersDB() {
-            if (window.sqliteDB) {
-                try {
-                    const rows = window.dbQuery(`SELECT id, username, password, name, role, created_at as createdAt FROM users`);
-                    if (rows && rows.length > 0) {
-                        return rows.map(r => ({ 
-                            ...r, 
-                            brigadeId: (r.brigadeId !== undefined && r.brigadeId !== null && r.brigadeId !== '') 
-                                ? r.brigadeId 
-                                : ((r.role === 'admin' || r.role === 'super_invite') ? 'ALL' : 'brg_guepard') 
-                        }));
-                    }
-                } catch(e) {
-                    console.error("Erreur lecture users SQLite:", e);
-                }
-            }
-            let u = localStorage.getItem(USERS_STORAGE_KEY);
-            let usersList = [];
-            if (u) {
-                try {
-                    usersList = JSON.parse(u);
-                    if (!Array.isArray(usersList)) usersList = [];
-                } catch(e) {
-                    usersList = [];
-                }
-            }
-            DEFAULT_USERS.forEach(def => {
-                if (!usersList.some(x => x.username.toLowerCase() === def.username.toLowerCase())) {
-                    usersList.push(def);
-                }
-            });
-            return usersList;
-        }
-
-        function resetDefaultUsersDB() {
-            localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
-            if (window.sqliteDB) {
-                try {
-                    window.dbExec(`DELETE FROM users`);
-                    DEFAULT_USERS.forEach(u => {
-                        window.dbExec(
-                            `INSERT INTO users (id, username, password, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-                            [u.id, u.username, u.password, u.name, u.role, u.createdAt || '2026-07-23']
-                        );
-                    });
-                    window.saveDBToServer();
-                } catch(e) {}
-            }
-            alert("✅ Mots de passe réinitialisés aux valeurs par défaut !\n\n• Admin : admin / admin123\n• Commandement : cmd / invite123\n• Planif GUÉPARD : planif / planif123\n• Invité GUÉPARD : invite / invite123");
-            const err = document.getElementById('loginError');
-            if (err) err.classList.add('hidden');
-        }
-
-        function handleLoginSubmit(e) {
-            e.preventDefault();
-            const usernameInput = (document.getElementById('loginUsername').value || '').trim();
-            const passwordInput = (document.getElementById('loginPassword').value || '').trim();
-            const errorDiv = document.getElementById('loginError');
-
-            let users = getUsersDB();
-            
-            if (!users || users.length === 0) {
-                users = DEFAULT_USERS;
-                saveUsersDB(users);
-            }
-
-            let found = users.find(u => 
-                u.username.toLowerCase() === usernameInput.toLowerCase() && 
-                (u.password === passwordInput || 
-                 (u.username === 'admin' && passwordInput === 'admin123') ||
-                 (u.username === 'cmd' && passwordInput === 'invite123') ||
-                 (u.username === 'planif' && passwordInput === 'planif123') ||
-                 (u.username === 'invite' && passwordInput === 'invite123'))
-            );
-
-            if (!found) {
-                const def = DEFAULT_USERS.find(d => d.username.toLowerCase() === usernameInput.toLowerCase() && d.password === passwordInput);
-                if (def) {
-                    found = def;
-                    users.push(def);
-                    saveUsersDB(users);
-                }
-            }
-
-            if (found) {
-                found.password = passwordInput;
-                saveUsersDB(users);
-
-                setCurrentUser({
-                    id: found.id,
-                    username: found.username,
-                    name: found.name,
-                    role: found.role,
-                    brigadeId: found.brigadeId || (found.role === 'admin' || found.role === 'super_invite' ? 'ALL' : 'brg_guepard')
-                });
-
-                if (found.brigadeId && found.brigadeId !== 'ALL') {
-                    localStorage.setItem('caf_active_brigade_id', found.brigadeId);
-                }
-
-                errorDiv.classList.add('hidden');
-                checkAuthSession();
-                loadAllFromSQLite();
-                
-                currentSelectedYear = determineInitialSelectedYear();
-                localStorage.setItem('caf_active_year', currentSelectedYear);
-                ensureYearStructure(currentSelectedYear);
-                refreshYearDropdowns();
-                refreshValidationBtn();
-                renderHeaders();
-                renderRows();
-                renderTotals();
-            } else {
-                errorDiv.innerText = "Identifiant ou mot de passe incorrect.";
-                errorDiv.classList.remove('hidden');
-            }
-        }
-
-        function saveUsersDB(users) {
-            localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-            if (window.sqliteDB) {
-                try {
-                    users.forEach(u => {
-                        const targetBrigade = u.brigadeId !== undefined && u.brigadeId !== null && u.brigadeId !== '' 
-                            ? u.brigadeId 
-                            : ((u.role === 'admin' || u.role === 'super_invite') ? 'ALL' : 'brg_guepard');
-                        window.dbExec(
-                            `INSERT OR REPLACE INTO users (id, username, password, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-                            [u.id, u.username, u.password, u.name, u.role, u.createdAt || u.created_at || '2026-07-23']
-                        );
-                    });
-                    window.saveDBToServer();
-                } catch(e) {
-                    console.error("Erreur sauvegarde users SQLite:", e);
-                }
-            }
-        }
-
-        function authorizeSatelliteAccess() {
-            sessionStorage.setItem('caf_satellite_access_granted', Date.now().toString());
-        }
-
-        function getCurrentUser() {
-            let u = localStorage.getItem(CURRENT_USER_KEY) || sessionStorage.getItem(CURRENT_USER_KEY);
-            if (!u) return null;
-            try { return JSON.parse(u); } catch(e) { return null; }
-        }
-
-        function setCurrentUser(user) {
-            localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-            sessionStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-            sessionStorage.setItem('caf_tab_alive', 'true');
-        }
-
-        function logoutUser() {
-            localStorage.removeItem(CURRENT_USER_KEY);
-            sessionStorage.removeItem(CURRENT_USER_KEY);
-            sessionStorage.removeItem('caf_tab_alive');
-            location.reload();
-        }
-
-        function checkAuthSession() {
             const adminUser = { id: 'usr_admin', username: 'admin', role: 'admin', name: 'iPad Admin', brigadeId: 'ALL' };
             localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(adminUser));
+            const user = adminUser;
             const loginModal = document.getElementById('loginModal');
-            if (loginModal) loginModal.classList.add('hidden');
-            updateUserUI(adminUser);
-            return true;
+            if (!user) {
+                if (loginModal) loginModal.classList.remove('hidden');
+                return false;
+            } else {
+                if (loginModal) loginModal.classList.add('hidden');
+                updateUserUI(user);
+                return true;
+            }
         }
 
         function openChangePasswordModal() {
@@ -2514,6 +2429,24 @@
                     }));
                     localStorage.setItem('caf_students_db_v1', JSON.stringify(loadedStudents));
                 }
+
+                // 12. Visual Markers
+                let markerRows = window.dbQuery(`SELECT * FROM markers WHERE project_id = ? AND ${brgClause}`, [pid, brgId]);
+                visualMarkers = [];
+                if (markerRows && markerRows.length > 0) {
+                    visualMarkers = markerRows.map(r => ({
+                        id: r.id,
+                        shape: r.shape,
+                        color: r.color,
+                        text: r.text,
+                        top: parseFloat(r.top),
+                        left: parseFloat(r.left),
+                        width: parseFloat(r.width),
+                        height: parseFloat(r.height)
+                    }));
+                    localStorage.setItem('caf_markers_v3', JSON.stringify(visualMarkers));
+                }
+
             } catch(e) {
                 console.error("Erreur chargement SQLite:", e);
             }
@@ -2892,9 +2825,9 @@
                 else { rowMap[cours][assignedRowIndex].push(stage); }
             });
 
-            if (rowMap.pil.length === 0) rowMap.pil.length = 0; // Prevent undefined
-            if (rowMap.mo.length === 0) rowMap.mo.length = 0;
-            if (rowMap.tactique.length === 0) rowMap.tactique.length = 0;
+            if (rowMap.pil.length === 0) rowMap.pil.push([]);
+            if (rowMap.mo.length === 0) rowMap.mo.push([]);
+            if (rowMap.tactique.length === 0) rowMap.tactique.push([]);
             return rowMap;
         }
 
@@ -2911,12 +2844,28 @@
 
             renderSectionTitle(container, "🛡️ COURS CB / CP", "border-indigo-500/30 text-indigo-400 bg-indigo-950/20");
             if(dynamicRows.tactique) dynamicRows.tactique.forEach((stageList, idx) => { createRowHtml(container, 'tactique', idx, stageList, isYearValidated); });
+
+            renderMarkers(container);
         }
 
         function renderSectionTitle(container, text, classes) {
             let div = document.createElement('div');
             div.className = `w-full p-1.5 px-4 text-xs font-black tracking-widest border-b uppercase ${classes}`;
             div.innerText = text; container.appendChild(div);
+        }
+
+                function getTextColorForTailwind(bgClass) {
+            if (!bgClass) return 'text-white';
+            const match = bgClass.match(/bg-([a-z]+)-(\d+)/);
+            if (!match) {
+                if (bgClass.includes('white')) return 'text-black';
+                return 'text-white';
+            }
+            const color = match[1];
+            const shade = parseInt(match[2]);
+            if (['yellow', 'lime', 'cyan', 'amber'].includes(color) && shade <= 500) return 'text-black';
+            if (shade <= 400) return 'text-black';
+            return 'text-white';
         }
 
         function getContrastYIQ(hexcolor){
@@ -2927,7 +2876,7 @@
             var g = parseInt(hexcolor.substr(2,2),16);
             var b = parseInt(hexcolor.substr(4,2),16);
             var yiq = ((r*299)+(g*587)+(b*114))/1000;
-            return (yiq >= 128) ? 'text-black' : 'text-white';
+            return (yiq >= 110) ? 'text-black' : 'text-white';
         }
 
         function createRowHtml(container, coursKey, rowIndex, stageList, isYearValidated) {
@@ -2959,6 +2908,19 @@
         let bgClassOnly = "";
         let textColorClass = "text-white";
         
+        let borderStyles = "";
+        let prefix = stage.chainId ? "🔗 " : "";
+        let suffix = "";
+        
+        if ((parseInt(stage.count_ia) || 0) > 0) {
+            borderStyles += " ring-2 ring-red-500 ring-inset shadow-[0_0_8px_rgba(239,68,68,0.9)]";
+        }
+
+        if (stage.collisionWarning) {
+            borderStyles += " border-red-500 shadow-[0_0_12px_red]";
+            prefix = "⚠️ " + prefix;
+        }
+
         if (stage.colorHex && stage.useCustomColor !== "false") {
             bgStyle = `background-color: ${stage.colorHex}; border: 1px solid rgba(255,255,255,0.4);`;
             textColorClass = getContrastYIQ(stage.colorHex);
@@ -2968,23 +2930,17 @@
         } else {
             let fallbackColor = stage.colorOverride || (gc ? gc.color : '');
             bgClassOnly = fallbackColor.split(' ').filter(c => !c.startsWith('text-')).join(' ');
+            textColorClass = getTextColorForTailwind(bgClassOnly);
         }
         
-        let borderStyles = "";
-        let prefix = stage.chainId ? "🔗 " : "";
-        let suffix = "";
-        
-        if (stage.collisionWarning) {
-            borderStyles += " border-red-500 shadow-[0_0_12px_red]";
-            prefix = "⚠️ " + prefix;
-        }
+
 
         
           let arrowLeft = '';
           let arrowRight = '';
           
           if (bounds.startsInPast) {
-              borderStyles = "border-y border-r border-l border-l-white border-dashed rounded-l-none";
+              borderStyles += " border-y border-r border-l border-l-white border-dashed rounded-l-none";
               arrowLeft = `<div class="absolute left-0 inset-y-0 flex items-center justify-center bg-gray-900/50 w-4 border-r border-white/20"><svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg></div>`;
           }
           if (bounds.endsInFuture) {
@@ -2998,8 +2954,8 @@
           
           bandeau.className = `stage-bandeau absolute top-1 bottom-1 h-auto flex flex-col justify-between p-1 overflow-hidden shadow-lg cursor-move z-40 hover:z-50 hover:brightness-110 ${textColorClass} ${bgClassOnly} ${isYearValidated ? 'opacity-70 grayscale pointer-events-none' : ''} ${borderStyles}`;
         
-        let initialLeftPx = 180 + (bounds.startCol - 1) * 25 + 2;
-        bandeau.style = `${bgStyle} left: ${initialLeftPx}px; width: calc(${bounds.width * 25}px - 4px);`;
+        let initialLeftPx = 180 + (bounds.startCol - 1) * 25 + 1;
+        bandeau.style = `${bgStyle} left: ${initialLeftPx}px; width: calc(${bounds.width * 25}px - 3px);`;
         
         bandeau.dataset.id = stage.id;
         
@@ -3088,7 +3044,7 @@
                 if (bounds.startsInPast) { e.preventDefault(); return; }
 
                 e.preventDefault(); let hasMoved = false; const startX = e.clientX;
-                const initialLeft = 180 + (bounds.startCol - 1) * 25 + 2;
+                const initialLeft = 180 + (bounds.startCol - 1) * 25 + 1;
                 let movedLeft = initialLeft;
                 
                 let wasClick = true;
@@ -3142,18 +3098,20 @@
                             }
                         }
                         
-                        let remCol = finalAbsCol;
-                        let targetY = yearsList[0], targetW = 1;
-                        for(let y of yearsList) {
-                            let wCount = getISOWeeksInYear(y);
-                            if (remCol <= wCount) { targetY = y; targetW = Math.max(1, remCol); break; }
-                            remCol -= wCount;
+                                                let targetY = currentSelectedYear;
+                        let targetW = finalAbsCol;
+                        while (true) {
+                            let wCount = getISOWeeksInYear(targetY);
+                            if (targetW <= wCount) break;
+                            targetW -= wCount;
+                            targetY++;
                         }
                         
                         recordAuditLog('MODIFICATION_STAGE', `Stage ${stage.customName || stage.id} déplacé de S${stage.startWeek}/${stage.startYear} à S${targetW}/${targetY}`, stage.id);
                         stage.startWeek = targetW; 
                         stage.startYear = targetY;
                         saveAndSync();
+                        renderRows();
                     } else {
                         renderRows();
                     }
@@ -3957,6 +3915,7 @@
             localStorage.setItem('caf_off_weeks_multi_v3', JSON.stringify(offWeeksMulti)); 
             localStorage.setItem('caf_years_list_v3', JSON.stringify(yearsList)); 
             localStorage.setItem('caf_validated_years_v3', JSON.stringify(validatedYears)); 
+            localStorage.setItem('caf_markers_v3', JSON.stringify(visualMarkers));
 
             if (window.sqliteDB) {
                 try {
@@ -4049,6 +4008,17 @@
                     saveUsersDB(getUsersDB());
                     if (typeof getStudentsDB === 'function') {
                         saveStudentsDB(getStudentsDB());
+                    }
+
+                    // 11. Sync Visual Markers
+                    window.dbExec(`DELETE FROM markers WHERE project_id = ? AND ${brgClause}`, [pid, brgId]);
+                    if (visualMarkers) {
+                        visualMarkers.forEach(m => {
+                            window.dbExec(
+                                `INSERT OR REPLACE INTO markers (id, project_id, brigade_id, shape, color, text, top, left, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                                [m.id, pid, brgId, m.shape || 'rectangle', m.color || 'bg-yellow-400', m.text || '', parseFloat(m.top) || 0, parseFloat(m.left) || 0, parseFloat(m.width) || 100, parseFloat(m.height) || 40]
+                            );
+                        });
                     }
 
                     window.saveDBToServer();
@@ -4173,7 +4143,7 @@
             const fluxData = JSON.parse(localStorage.getItem('caf_scenarios_flux') || '[]');
             const parcData = JSON.parse(localStorage.getItem('caf_parc_machines') || '[]');
             const rhData = JSON.parse(localStorage.getItem('caf_rh_config_v3') || '{}');
-            const exportPayload = { stages: stages.filter(s => selectedYears.includes(s.startYear)), templates, offWeeksMulti, yearsList: selectedYears, validatedYears, fluxData, parcData, rhData };
+            const exportPayload = { stages: stages.filter(s => selectedYears.includes(s.startYear)), templates, offWeeksMulti, yearsList: selectedYears, validatedYears, fluxData, parcData, rhData, visualMarkers };
             const a = document.createElement('a'); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload)); a.download = `planning_caf_v3_${selectedYears.join('_')}.json`; a.click(); closeExportModal();
         }
         function importData(e) {
@@ -4201,6 +4171,7 @@
                         if (d.fluxData) localStorage.setItem('caf_scenarios_flux', JSON.stringify(d.fluxData));
                         if (d.parcData) localStorage.setItem('caf_parc_machines', JSON.stringify(d.parcData));
                         if (d.rhData) localStorage.setItem('caf_rh_config_v3', JSON.stringify(d.rhData));
+                        if (d.visualMarkers) visualMarkers = d.visualMarkers;
                     } else if (d && d.data && Array.isArray(d.data.stages)) {
                         rawStages = d.data.stages;
                         importedTemplates = d.data.templates;
@@ -4255,6 +4226,291 @@
             stages.forEach(s => { if (s.formType === oldKey) s.formType = newName; });
             saveAndSync(); openSettingsModal();
         }
+        // --- VISUAL MARKERS LOGIC ---
+        function addMarker() {
+            const container = document.getElementById('planning-rows');
+            const parentScroll = container.parentElement ? container.parentElement.scrollTop : 0;
+            const m = {
+                id: 'm_' + Date.now(),
+                shape: 'rectangle',
+                color: 'bg-yellow-500',
+                text: 'Repère',
+                top: parentScroll + 50,
+                left: 200,
+                width: 100,
+                height: 40
+            };
+            visualMarkers.push(m);
+            saveAndSync();
+            renderRows();
+        }
+
+        function renderMarkers(container) {
+            visualMarkers.forEach(m => {
+                const el = document.createElement('div');
+                el.className = `absolute cursor-move shadow-lg flex items-center justify-center text-center text-xs font-bold z-50 hover:ring-2 hover:ring-white transition-shadow`;
+                
+                let isOutline = m.color.includes('border');
+                let colorMatch = isOutline ? m.color.match(/text-([a-z0-9-]+)/) : m.color.match(/bg-([a-z0-9-]+)/);
+                let colorName = colorMatch ? colorMatch[1] : 'yellow-500';
+                
+                let svgClass = '';
+                let textClass = '';
+                if (m.color === 'bg-white') {
+                    svgClass = `text-white fill-current stroke-none`;
+                    textClass = `text-gray-900`;
+                } else if (isOutline) {
+                    svgClass = `text-${colorName} fill-transparent stroke-current`;
+                    textClass = `text-${colorName}`;
+                } else {
+                    svgClass = `text-${colorName} fill-current stroke-none`;
+                    textClass = getTextColorForTailwind('bg-' + colorName);
+                }
+                
+                let sw = isOutline ? '3' : '0';
+
+                let svgInner = '';
+                switch(m.shape) {
+                    case 'rectangle': svgInner = `<rect x="0" y="0" width="100" height="100" vector-effect="non-scaling-stroke" />`; break;
+                    case 'ellipse': svgInner = `<ellipse cx="50" cy="50" rx="50" ry="50" vector-effect="non-scaling-stroke" />`; break;
+                    case 'triangle': svgInner = `<polygon points="50,0 100,100 0,100" vector-effect="non-scaling-stroke" />`; break;
+                    case 'diamond': svgInner = `<polygon points="50,0 100,50 50,100 0,50" vector-effect="non-scaling-stroke" />`; break;
+                    case 'arrowRight': svgInner = `<polygon points="0,25 60,25 60,0 100,50 60,100 60,75 0,75" vector-effect="non-scaling-stroke" />`; break;
+                    case 'arrowLeft': svgInner = `<polygon points="100,25 40,25 40,0 0,50 40,100 40,75 100,75" vector-effect="non-scaling-stroke" />`; break;
+                    case 'arrowUp': svgInner = `<polygon points="25,100 25,40 0,40 50,0 100,40 75,40 75,100" vector-effect="non-scaling-stroke" />`; break;
+                    case 'arrowDown': svgInner = `<polygon points="25,0 25,60 0,60 50,100 100,60 75,60 75,0" vector-effect="non-scaling-stroke" />`; break;
+                    case 'hexagon': svgInner = `<polygon points="25,0 75,0 100,50 75,100 25,100 0,50" vector-effect="non-scaling-stroke" />`; break;
+                    case 'star': svgInner = `<polygon points="50,0 61,35 98,35 68,57 79,91 50,70 21,91 32,57 2,35 39,35" vector-effect="non-scaling-stroke" />`; break;
+                    case 'cross': svgInner = `<polygon points="20,0 50,30 80,0 100,20 70,50 100,80 80,100 50,70 20,100 0,80 30,50 0,20" vector-effect="non-scaling-stroke" />`; break;
+                    case 'parallelogram': svgInner = `<polygon points="20,0 100,0 80,100 0,100" vector-effect="non-scaling-stroke" />`; break;
+                    case 'cylinder': svgInner = `<path d="M 0 20 C 0 0, 100 0, 100 20 L 100 80 C 100 100, 0 100, 0 80 Z M 0 20 C 0 40, 100 40, 100 20" vector-effect="non-scaling-stroke" />`; break;
+                    case 'bubble': svgInner = `<path d="M 0 0 L 100 0 L 100 70 L 60 70 L 30 100 L 30 70 L 0 70 Z" vector-effect="non-scaling-stroke" />`; break;
+                    default: svgInner = `<rect x="0" y="0" width="100" height="100" vector-effect="non-scaling-stroke" />`;
+                }
+
+                el.innerHTML = `
+                    <svg class="absolute inset-0 w-full h-full ${svgClass}" preserveAspectRatio="none" viewBox="0 0 100 100" style="overflow:visible; stroke-width:${sw}px;">
+                        ${svgInner}
+                    </svg>
+                    <span class="relative z-10 w-full break-words px-1 ${textClass}" style="line-height: 1.1;">${m.text}</span>
+                `;
+
+                el.style.top = m.top + 'px';
+                el.style.left = m.left + 'px';
+                el.style.width = (m.width || 100) + 'px';
+                el.style.height = (m.height || 40) + 'px';
+if (m.rotation) el.style.transform = 'rotate(' + m.rotation + 'deg)';
+
+// Add resize handle
+const resizeHandle = document.createElement('div');
+resizeHandle.className = "absolute right-0 bottom-0 w-3 h-3 cursor-se-resize z-20 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity";
+resizeHandle.innerHTML = '<svg viewBox="0 0 10 10" class="w-full h-full text-white mix-blend-difference"><polygon points="10,0 10,10 0,10" fill="currentColor"/></svg>';
+resizeHandle.onmousedown = (e) => startResizeMarker(e, m, el);
+el.appendChild(resizeHandle);
+
+// Add rotation handle
+const rotateHandle = document.createElement('div');
+rotateHandle.className = "absolute left-1/2 -top-6 -ml-2 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white cursor-pointer z-20 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity flex items-center justify-center shadow";
+rotateHandle.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" stroke="white" stroke-width="3" fill="none"><path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>';
+rotateHandle.onmousedown = (e) => startRotateMarker(e, m, el);
+el.appendChild(rotateHandle);
+
+// Line connecting rotation handle to top
+const rotateLine = document.createElement('div');
+rotateLine.className = "absolute left-1/2 -top-2 w-px h-2 bg-emerald-500 z-10 opacity-0 group-hover:opacity-100 transition-opacity";
+el.appendChild(rotateLine);
+
+el.classList.add('group'); // For hover effect on handle
+                
+                el.onmousedown = (e) => startDragMarker(e, m, el);
+                el.ondblclick = (e) => { e.stopPropagation(); openMarkerModal(m.id); };
+                
+                container.appendChild(el);
+            });
+        }
+
+        let resizeMarkerData = null;
+        let resizeStartX = 0, resizeStartY = 0;
+        let resizeStartWidth = 0, resizeStartHeight = 0;
+
+        function startResizeMarker(e, m, el) {
+            e.stopPropagation();
+            e.preventDefault();
+            if (e.button !== 0) return;
+            
+            resizeMarkerData = { m, el };
+            resizeStartX = e.clientX;
+            resizeStartY = e.clientY;
+            resizeStartWidth = el.offsetWidth;
+            resizeStartHeight = el.offsetHeight;
+            
+            document.addEventListener('mousemove', onResizeMarker);
+            document.addEventListener('mouseup', stopResizeMarker);
+        }
+
+        function onResizeMarker(e) {
+            if (!resizeMarkerData) return;
+            let newWidth = resizeStartWidth + (e.clientX - resizeStartX);
+            let newHeight = resizeStartHeight + (e.clientY - resizeStartY);
+            
+            if (newWidth < 20) newWidth = 20;
+            if (newHeight < 20) newHeight = 20;
+            
+            resizeMarkerData.m.width = newWidth;
+            resizeMarkerData.m.height = newHeight;
+            resizeMarkerData.el.style.width = newWidth + 'px';
+            resizeMarkerData.el.style.height = newHeight + 'px';
+        }
+
+        function stopResizeMarker(e) {
+            document.removeEventListener('mousemove', onResizeMarker);
+            document.removeEventListener('mouseup', stopResizeMarker);
+            if (resizeMarkerData) {
+                saveAndSync();
+                resizeMarkerData = null;
+            }
+        }
+
+        let rotateMarkerData = null;
+        function startRotateMarker(e, m, el) {
+            e.stopPropagation();
+            e.preventDefault();
+            if (e.button !== 0) return;
+            
+            const rect = el.getBoundingClientRect();
+            // Calculate center of the element in viewport coordinates
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            rotateMarkerData = { m, el, centerX, centerY };
+            
+            document.addEventListener('mousemove', onRotateMarker);
+            document.addEventListener('mouseup', stopRotateMarker);
+        }
+
+        function onRotateMarker(e) {
+            if (!rotateMarkerData) return;
+            // Calculate angle from center to mouse
+            const dx = e.clientX - rotateMarkerData.centerX;
+            const dy = e.clientY - rotateMarkerData.centerY;
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+            
+            // atan2 is 0 at 3 o'clock, but our handle is at 12 o'clock (top)
+            angle += 90; 
+            
+            // Snap to 15 degrees if holding shift
+            if (e.shiftKey) {
+                angle = Math.round(angle / 15) * 15;
+            }
+            
+            rotateMarkerData.m.rotation = angle;
+            rotateMarkerData.el.style.transform = "rotate(" + angle + "deg)";
+        }
+
+        function stopRotateMarker(e) {
+            document.removeEventListener('mousemove', onRotateMarker);
+            document.removeEventListener('mouseup', stopRotateMarker);
+            if (rotateMarkerData) {
+                saveAndSync();
+                rotateMarkerData = null;
+            }
+        }
+
+        let dragMarker = null;
+        let dragOffsetX = 0, dragOffsetY = 0;
+        let dragHasMoved = false;
+
+        function startDragMarker(e, m, el) {
+            e.stopPropagation();
+            if (e.button !== 0) return; // Left click only
+            
+            dragHasMoved = false;
+            
+            const container = document.getElementById('planning-rows');
+            const rect = container.getBoundingClientRect();
+            
+            dragMarker = { m, el, containerRect: rect };
+            
+            // Calculate offset relative to the element's top-left corner
+            const elRect = el.getBoundingClientRect();
+            dragOffsetX = e.clientX - elRect.left;
+            dragOffsetY = e.clientY - elRect.top;
+            
+            document.addEventListener('mousemove', onDragMarker);
+            document.addEventListener('mouseup', stopDragMarker);
+        }
+
+        function onDragMarker(e) {
+            if (!dragMarker) return;
+            dragHasMoved = true;
+            
+            const container = document.getElementById('planning-rows');
+            const rect = container.getBoundingClientRect();
+            
+            let newLeft = e.clientX - rect.left - dragOffsetX;
+            let newTop = e.clientY - rect.top - dragOffsetY;
+            
+            // Prevent dragging completely out of bounds (optional, but good for UX)
+            if (newTop < 0) newTop = 0;
+            if (newLeft < 0) newLeft = 0;
+            
+            dragMarker.m.left = newLeft;
+            dragMarker.m.top = newTop;
+            dragMarker.el.style.left = newLeft + 'px';
+            dragMarker.el.style.top = newTop + 'px';
+        }
+
+        function stopDragMarker() {
+            document.removeEventListener('mousemove', onDragMarker);
+            document.removeEventListener('mouseup', stopDragMarker);
+            if (dragMarker) {
+                if (dragHasMoved) {
+                    saveAndSync();
+                }
+                dragMarker = null;
+            }
+        }
+
+        function openMarkerModal(id) {
+            const m = visualMarkers.find(x => x.id === id);
+            if (!m) return;
+            document.getElementById('markerId').value = m.id;
+            document.getElementById('markerText').value = m.text;
+            document.getElementById('markerShape').value = m.shape;
+            document.getElementById('markerColor').value = m.color;
+            document.getElementById('markerWidth').value = m.width || 100;
+            document.getElementById('markerHeight').value = m.height || 40;
+            document.getElementById('markerModal').classList.remove('hidden');
+        }
+
+        function closeMarkerModal() {
+            document.getElementById('markerModal').classList.add('hidden');
+        }
+
+        function saveMarker() {
+            const id = document.getElementById('markerId').value;
+            const m = visualMarkers.find(x => x.id === id);
+            if (m) {
+                m.text = document.getElementById('markerText').value;
+                m.shape = document.getElementById('markerShape').value;
+                m.color = document.getElementById('markerColor').value;
+                m.width = parseFloat(document.getElementById('markerWidth').value) || 100;
+                m.height = parseFloat(document.getElementById('markerHeight').value) || 40;
+                saveAndSync();
+                renderRows();
+            }
+            closeMarkerModal();
+        }
+
+        function deleteMarker() {
+            const id = document.getElementById('markerId').value;
+            visualMarkers = visualMarkers.filter(x => x.id !== id);
+            saveAndSync();
+            renderRows();
+            closeMarkerModal();
+        }
+        // --- END VISUAL MARKERS LOGIC ---
+
         function toggleMenu() { document.getElementById('burgerMenu').classList.toggle('hidden'); }
 
         async function exportToPDF() {
@@ -5002,6 +5258,16 @@
     </div>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
 
 
 

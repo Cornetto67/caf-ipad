@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -7,7 +7,7 @@
     <script src="libs/chart.js"></script>
     <script src="libs/sql-wasm.js"></script>
     <script src="libs/sql-wasm-b64.js"></script>
-    <script src="sqlite-engine.js?v=1.4.1"></script>
+    <script src="sqlite-engine.js?v=1.4.2"></script>
     <style>
         .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 4px; }
@@ -75,14 +75,14 @@
         <!-- Graphique 1 -->
         <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl relative h-[350px] flex flex-col">
             <button onclick="downloadChart('chart-annuel', 'Flux_Annuel_CAF')" class="absolute top-3 right-4 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 p-1.5 rounded transition shadow z-10" title="Exporter l'image pour PPT">📷 Exporter</button>
-            <div class="flex-1 relative w-full h-full"><canvas id="chart-annuel"></canvas></div>
+            <div class="flex-1 relative w-full h-full"><canvas id="chart-annuel" ondblclick="openChartEditor(chartAnnuelInstance)"></canvas></div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Graphique 2 -->
             <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl relative h-[350px] flex flex-col">
                 <button onclick="downloadChart('chart-cumule', 'Flux_Cumule_CAF')" class="absolute top-3 right-4 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 p-1.5 rounded transition shadow z-10" title="Exporter l'image pour PPT">📷 Exporter</button>
-                <div class="flex-1 relative w-full h-full"><canvas id="chart-cumule"></canvas></div>
+                <div class="flex-1 relative w-full h-full"><canvas id="chart-cumule" ondblclick="openChartEditor(chartCumuleInstance)"></canvas></div>
             </div>
             
             <!-- Graphique 3 -->
@@ -97,7 +97,7 @@
                     </select>
                 </div>
 
-                <div class="flex-1 relative w-full h-full"><canvas id="chart-suivi-ecole"></canvas></div>
+                <div class="flex-1 relative w-full h-full"><canvas id="chart-suivi-ecole" ondblclick="openChartEditor(chartEcoleInstance)"></canvas></div>
             </div>
         </div>
     </main>
@@ -207,7 +207,7 @@
 
         stages.forEach(s => {
             let t = templates[s.formType];
-            let templateName = t ? (t.cours || '').toUpperCase() : '';
+            let templateName = String(s.formType || '').toUpperCase();
             let isPil = templateName.includes('PIL');
 
             if (isPil) {
@@ -220,9 +220,18 @@
             }
         });
 
-        const labels = fluxData.map(d => d.annee);
-        const dataBesoin = fluxData.map(d => parseInt(d.besoin) || 0);
-        const dataPropo = fluxData.map(d => parseInt(d.proposition) || 0);
+                let activeFluxData = fluxData.filter(d => {
+            const y = d.annee;
+            const b = parseInt(d.besoin) || 0;
+            const p = parseInt(d.proposition) || 0;
+            const r = reelsPilRhc[y] || 0;
+            return (b > 0 || p > 0 || r > 0);
+        });
+        if (activeFluxData.length === 0) activeFluxData = fluxData;
+
+        const labels = activeFluxData.map(d => d.annee);
+        const dataBesoin = activeFluxData.map(d => parseInt(d.besoin) || 0);
+        const dataPropo = activeFluxData.map(d => parseInt(d.proposition) || 0);
         const dataRealPilRhc = labels.map(y => reelsPilRhc[y] || 0);
 
         let cBesoin = [], cPropo = [], cRealRhc = [];
@@ -322,7 +331,7 @@ function updateGraph3() {
 
         stages.forEach(s => {
             let t = templates[s.formType];
-            let templateName = t ? (t.cours || '').toUpperCase() : '';
+            let templateName = String(s.formType || '').toUpperCase();
             let isPil = templateName.includes('PIL');
             let isMo = templateName.includes('TRI') || templateName.includes('TTI') || templateName.includes('MO');
 
@@ -574,5 +583,62 @@ function updateGraph3() {
         <span>Créateur : <b class="text-gray-200">CDT CORNET Guillaume</b></span>
         <span class="text-emerald-400 font-mono font-bold border-l border-gray-700 pl-2">v1.4 BETA</span>
     </div>
+<!-- MODALE EDITION GRAPHIQUE -->
+<div id="chartEditModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[100] hidden">
+    <div class="bg-gray-800 border border-gray-700 rounded-lg w-11/12 max-w-md shadow-2xl flex flex-col">
+        <div class="p-4 border-b border-gray-700">
+            <h2 class="text-lg font-bold text-amber-400">✏️ Modifier le graphique</h2>
+        </div>
+        <div class="p-4 flex flex-col gap-4" id="chartEditContainer">
+            <!-- Rempli dynamiquement -->
+        </div>
+        <div class="p-4 border-t border-gray-700 flex justify-end gap-2 bg-gray-900/50">
+            <button onclick="document.getElementById('chartEditModal').classList.add('hidden')" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white font-bold rounded">Annuler</button>
+            <button id="btnSaveChartEdit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded">Enregistrer</button>
+        </div>
+    </div>
+</div>
+<script>
+let currentEditingChart = null;
+function openChartEditor(chartInstance) {
+    if (!chartInstance) return;
+    currentEditingChart = chartInstance;
+    const container = document.getElementById('chartEditContainer');
+    container.innerHTML = '';
+    
+    // Titre
+    const titleOpt = chartInstance.options.plugins?.title;
+    let currentTitle = titleOpt?.text || '';
+    if (Array.isArray(currentTitle)) currentTitle = currentTitle.join(' ');
+    
+    if (titleOpt?.display) {
+        container.innerHTML += '<div class="mb-3"><label class="block text-xs font-bold text-gray-400 mb-1">Titre du graphique</label><input type="text" id="editChartTitle" value="' + currentTitle.replace(/"/g, '&quot;') + '" class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white"></div>';
+    }
+
+    // Datasets
+    chartInstance.data.datasets.forEach((ds, i) => {
+        container.innerHTML += '<div class="mb-3"><label class="block text-xs font-bold text-gray-400 mb-1">Légende ' + (i+1) + '</label><input type="text" id="editChartLegend_' + i + '" value="' + (ds.label || '').replace(/"/g, '&quot;') + '" class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white"></div>';
+    });
+
+    document.getElementById('btnSaveChartEdit').onclick = function() {
+        if (titleOpt?.display) {
+            chartInstance.options.plugins.title.text = document.getElementById('editChartTitle').value;
+        }
+        chartInstance.data.datasets.forEach((ds, i) => {
+            const input = document.getElementById('editChartLegend_' + i);
+            if (input) ds.label = input.value;
+        });
+        chartInstance.update();
+        document.getElementById('chartEditModal').classList.add('hidden');
+    };
+
+    document.getElementById('chartEditModal').classList.remove('hidden');
+}
+</script>
 </body>
 </html>
+
+
+
+
+
