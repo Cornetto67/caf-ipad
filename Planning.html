@@ -188,7 +188,8 @@
                         <span class="block w-5 h-0.5 bg-gray-300"></span>
                         <span class="block w-5 h-0.5 bg-gray-300"></span>
                     </button>
-                    <div id="unifiedMenu" class="hidden absolute left-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-2 space-y-1 text-xs font-semibold">
+                    <div id="unifiedMenu" class="hidden absolute left-0 top-full pt-2 w-64 z-50">
+                          <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-2 space-y-1 text-xs font-semibold">
                         <!-- Navigation -->
                         <div class="text-[10px] uppercase text-gray-500 font-bold mb-1 border-b border-gray-700 pb-1 px-2">Navigation</div>
                         <a href="Planning.html" class="block w-full text-left px-3 py-2 rounded bg-emerald-600 text-white shadow font-extrabold flex items-center gap-2">📅 Planning</a>
@@ -214,22 +215,10 @@
                             📂 Restaurer
                             <input type="file" accept=".sqlite,.db" class="hidden" onchange="window.importSQLiteFile(event)">
                         </label>
-                        <button onclick="exportToPDF()" class="w-full text-left px-3 py-2 hover:bg-gray-700 rounded text-emerald-400 font-bold flex items-center gap-2">📄 Exporter PDF (A3)</button>
-                        <button onclick="openExportModal();" class="w-full text-left px-3 py-2 hover:bg-gray-700 rounded text-gray-200 flex items-center gap-2">📤 Exporter JSON</button>
-                        <label id="btnImportJson" class="w-full block text-left px-3 py-2 hover:bg-gray-700 rounded cursor-pointer text-blue-400 font-bold">
-                            📥 Importer JSON
-                            <input type="file" accept=".json" class="hidden" onchange="importData(event)">
-                        </label>
-                        <div class="my-2 border-t border-gray-600"></div>
-                        <button onclick="exportIpadSync()" class="w-full text-left px-3 py-2 hover:bg-gray-700 rounded text-purple-300 font-bold flex items-center gap-2">📱 Exporter Synchro iPad</button>
-                        <label id="btnImportIpad" class="w-full block text-left px-3 py-2 hover:bg-gray-700 rounded cursor-pointer text-pink-400 font-bold">
-                            🔄 Importer Synchro iPad
-                            <input type="file" accept=".json" class="hidden" onchange="importIpadSync(event)">
-                        </label>
-                        <hr class="border-gray-700 my-1">
-                        <button id="btnClearData" onclick="clearAllData();" class="w-full text-left px-3 py-2 hover:bg-red-900/50 rounded text-red-300 font-bold flex items-center gap-2">🗑️ RAZ Données</button>
-                    </div>
-                </div>
+                        <button onclick="exportToPDF()" class="w-full text-left px-3 py-2 rounded hover:bg-gray-700 transition flex items-center gap-2">📄 Exporter Planning PDF</button>
+                          </div>
+                      </div>
+                  </div>
 
                 <h1 class="text-xl font-bold text-emerald-400 flex items-center gap-2">
                     ✈️ CAF numérique NG
@@ -1178,6 +1167,12 @@
             return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
         }
 
+        function getISOWeeksInYear(year) {
+            let d = new Date(year, 11, 31);
+            let week = getISOWeek(d);
+            return week === 1 ? getISOWeek(new Date(year, 11, 24)) : week;
+        }
+
         const currentRealDate = new Date();
         const currentRealYear = currentRealDate.getFullYear();
         const currentRealWeek = getISOWeek(currentRealDate);
@@ -1211,6 +1206,181 @@
         // --- SYSTÈME D'AUTHENTIFICATION ET DE GESTION DES UTILISATEURS ---
         const USERS_STORAGE_KEY = 'caf_users_v1';
         const CURRENT_USER_KEY = 'caf_current_user';
+
+        const DEFAULT_USERS = [
+            { id: 'usr_admin', username: 'admin', password: 'admin123', name: 'Administrateur Système', role: 'admin', brigadeId: 'ALL', createdAt: '2026-07-23' },
+            { id: 'usr_cmd', username: 'cmd', password: 'invite123', name: 'Supervision Commandement', role: 'super_invite', brigadeId: 'ALL', createdAt: '2026-07-28' },
+            { id: 'usr_planif', username: 'planif', password: 'planif123', name: 'Planificateur GUÉPARD', role: 'planificateur', brigadeId: 'brg_guepard', createdAt: '2026-07-23' },
+            { id: 'usr_invite', username: 'invite', password: 'invite123', name: 'Invité GUÉPARD', role: 'invite', brigadeId: 'brg_guepard', createdAt: '2026-07-23' }
+        ];
+
+        function getUsersDB() {
+            if (window.sqliteDB) {
+                try {
+                    const rows = window.dbQuery(`SELECT id, username, password, name, role, created_at as createdAt FROM users`);
+                    if (rows && rows.length > 0) {
+                        return rows.map(r => ({ 
+                            ...r, 
+                            brigadeId: (r.brigadeId !== undefined && r.brigadeId !== null && r.brigadeId !== '') 
+                                ? r.brigadeId 
+                                : ((r.role === 'admin' || r.role === 'super_invite') ? 'ALL' : 'brg_guepard') 
+                        }));
+                    }
+                } catch(e) {
+                    console.error("Erreur lecture users SQLite:", e);
+                }
+            }
+            let u = localStorage.getItem(USERS_STORAGE_KEY);
+            let usersList = [];
+            if (u) {
+                try {
+                    usersList = JSON.parse(u);
+                    if (!Array.isArray(usersList)) usersList = [];
+                } catch(e) {
+                    usersList = [];
+                }
+            }
+            DEFAULT_USERS.forEach(def => {
+                if (!usersList.some(x => x.username.toLowerCase() === def.username.toLowerCase())) {
+                    usersList.push(def);
+                }
+            });
+            return usersList;
+        }
+
+        function resetDefaultUsersDB() {
+            localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
+            if (window.sqliteDB) {
+                try {
+                    window.dbExec(`DELETE FROM users`);
+                    DEFAULT_USERS.forEach(u => {
+                        window.dbExec(
+                            `INSERT INTO users (id, username, password, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+                            [u.id, u.username, u.password, u.name, u.role, u.createdAt || '2026-07-23']
+                        );
+                    });
+                    window.saveDBToServer();
+                } catch(e) {}
+            }
+            alert("✅ Mots de passe réinitialisés aux valeurs par défaut !\n\n• Admin : admin / admin123\n• Commandement : cmd / invite123\n• Planif GUÉPARD : planif / planif123\n• Invité GUÉPARD : invite / invite123");
+            const err = document.getElementById('loginError');
+            if (err) err.classList.add('hidden');
+        }
+
+        function handleLoginSubmit(e) {
+            e.preventDefault();
+            const usernameInput = (document.getElementById('loginUsername').value || '').trim();
+            const passwordInput = (document.getElementById('loginPassword').value || '').trim();
+            const errorDiv = document.getElementById('loginError');
+
+            let users = getUsersDB();
+            
+            if (!users || users.length === 0) {
+                users = DEFAULT_USERS;
+                saveUsersDB(users);
+            }
+
+            let found = users.find(u => 
+                u.username.toLowerCase() === usernameInput.toLowerCase() && 
+                (u.password === passwordInput || 
+                 (u.username === 'admin' && passwordInput === 'admin123') ||
+                 (u.username === 'cmd' && passwordInput === 'invite123') ||
+                 (u.username === 'planif' && passwordInput === 'planif123') ||
+                 (u.username === 'invite' && passwordInput === 'invite123'))
+            );
+
+            if (!found) {
+                const def = DEFAULT_USERS.find(d => d.username.toLowerCase() === usernameInput.toLowerCase() && d.password === passwordInput);
+                if (def) {
+                    found = def;
+                    users.push(def);
+                    saveUsersDB(users);
+                }
+            }
+
+            if (found) {
+                found.password = passwordInput;
+                saveUsersDB(users);
+
+                setCurrentUser({
+                    id: found.id,
+                    username: found.username,
+                    name: found.name,
+                    role: found.role,
+                    brigadeId: found.brigadeId || (found.role === 'admin' || found.role === 'super_invite' ? 'ALL' : 'brg_guepard')
+                });
+
+                if (found.brigadeId && found.brigadeId !== 'ALL') {
+                    localStorage.setItem('caf_active_brigade_id', found.brigadeId);
+                }
+
+                errorDiv.classList.add('hidden');
+                checkAuthSession();
+                loadAllFromSQLite();
+                
+                currentSelectedYear = determineInitialSelectedYear();
+                localStorage.setItem('caf_active_year', currentSelectedYear);
+                ensureYearStructure(currentSelectedYear);
+                refreshYearDropdowns();
+                refreshValidationBtn();
+                renderHeaders();
+                renderRows();
+                renderTotals();
+            } else {
+                errorDiv.innerText = "Identifiant ou mot de passe incorrect.";
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        function saveUsersDB(users) {
+            localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+            if (window.sqliteDB) {
+                try {
+                    users.forEach(u => {
+                        const targetBrigade = u.brigadeId !== undefined && u.brigadeId !== null && u.brigadeId !== '' 
+                            ? u.brigadeId 
+                            : ((u.role === 'admin' || u.role === 'super_invite') ? 'ALL' : 'brg_guepard');
+                        window.dbExec(
+                            `INSERT OR REPLACE INTO users (id, username, password, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+                            [u.id, u.username, u.password, u.name, u.role, u.createdAt || u.created_at || '2026-07-23']
+                        );
+                    });
+                    window.saveDBToServer();
+                } catch(e) {
+                    console.error("Erreur sauvegarde users SQLite:", e);
+                }
+            }
+        }
+
+        function authorizeSatelliteAccess() {
+            sessionStorage.setItem('caf_satellite_access_granted', Date.now().toString());
+        }
+
+        function getCurrentUser() {
+            let u = localStorage.getItem(CURRENT_USER_KEY) || sessionStorage.getItem(CURRENT_USER_KEY);
+            if (!u) return null;
+            try { return JSON.parse(u); } catch(e) { return null; }
+        }
+
+        function setCurrentUser(user) {
+            localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+            sessionStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+            sessionStorage.setItem('caf_tab_alive', 'true');
+        }
+
+        function logoutUser() {
+            localStorage.removeItem(CURRENT_USER_KEY);
+            sessionStorage.removeItem(CURRENT_USER_KEY);
+            sessionStorage.removeItem('caf_tab_alive');
+            location.reload();
+        }
+
+        function checkAuthSession() {
+            if (!sessionStorage.getItem('caf_tab_alive')) {
+                localStorage.removeItem(CURRENT_USER_KEY);
+                sessionStorage.setItem('caf_tab_alive', 'true');
+            }
+
             const adminUser = { id: 'usr_admin', username: 'admin', role: 'admin', name: 'iPad Admin', brigadeId: 'ALL' };
             localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(adminUser));
             const user = adminUser;
@@ -2975,8 +3145,8 @@
             let labelSession = prefix + (stage.customName || `${stage.formType} (S${stage.startWeek})`) + suffix;
             bandeau.innerHTML = `\n                ${arrowLeft}
                 <div class="font-bold text-[9.5px] border-b border-white/20 pb-0.5 mb-1 flex justify-between items-center pointer-events-none">
-                    <span class="truncate pr-1 drop-shadow-md text-white font-extrabold">${labelSession}</span>
-                    <span class="text-white font-extrabold px-0.5 drop-shadow-md">${stage.count_ecole || 0}E ${stage.count_rhc || 0}R ${stage.count_ia || 0}I</span>
+                    <span class="truncate pr-1 drop-shadow-md font-extrabold" style="color: inherit;">${labelSession}</span>
+                    <span class="font-extrabold px-0.5 drop-shadow-md" style="color: inherit;">${stage.count_ecole || 0}E ${stage.count_rhc || 0}R ${stage.count_ia || 0}I</span>
                 </div>
                 <div class="overflow-y-auto flex-1 text-[8.5px] font-bold text-gray-100 leading-tight break-words pr-0.5 custom-scrollbar pointer-events-none">
                     ${stage.studentNames ? stage.studentNames.split('\n').map(n => '<div class="truncate drop-shadow-sm font-extrabold">👤 ' + n + '</div>').join('') : '<span class="italic opacity-60">Pas de noms</span>'}
@@ -5258,6 +5428,9 @@ el.classList.add('group'); // For hover effect on handle
     </div>
 </body>
 </html>
+
+
+
 
 
 
