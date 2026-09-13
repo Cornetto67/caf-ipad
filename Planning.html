@@ -1396,7 +1396,7 @@
         }
 
         function openChangePasswordModal() {
-            const menu = document.getElementById('burgerMenu');
+            const menu = document.getElementById('unifiedMenu');
             if (menu) menu.classList.add('hidden');
             document.getElementById('changePasswordForm').reset();
             document.getElementById('pwdError').classList.add('hidden');
@@ -1511,7 +1511,7 @@
         }
 
         function openAdminUnlockModal() {
-            const menu = document.getElementById('burgerMenu');
+            const menu = document.getElementById('unifiedMenu');
             if (menu) menu.classList.add('hidden');
             document.getElementById('adminUnlockPassword').value = '';
             document.getElementById('adminUnlockError').classList.add('hidden');
@@ -1674,7 +1674,7 @@
                 alert("Seuls les administrateurs ont accès au gestionnaire d'utilisateurs.");
                 return;
             }
-            const menu = document.getElementById('burgerMenu');
+            const menu = document.getElementById('unifiedMenu');
             if (menu) menu.classList.add('hidden');
             resetUserForm();
             populateUserBrigadeSelect();
@@ -1834,7 +1834,7 @@
                 alert("Seuls les administrateurs ont accès à la gestion des brigades.");
                 return;
             }
-            const menu = document.getElementById('burgerMenu');
+            const menu = document.getElementById('unifiedMenu');
             if (menu) menu.classList.add('hidden');
             resetBrigadeForm();
             renderBrigadesTable();
@@ -4681,7 +4681,7 @@ el.classList.add('group'); // For hover effect on handle
         }
         // --- END VISUAL MARKERS LOGIC ---
 
-        function toggleMenu() { document.getElementById('burgerMenu').classList.toggle('hidden'); }
+        function toggleMenu() { let m = document.getElementById('unifiedMenu'); if (m) m.classList.toggle('hidden'); }
 
         async function exportToPDF() {
             toggleMenu(); 
@@ -5195,7 +5195,7 @@ el.classList.add('group'); // For hover effect on handle
         }
 
         function openFluxModal() {
-            const menu = document.getElementById('burgerMenu');
+            const menu = document.getElementById('unifiedMenu');
             if (menu) menu.classList.add('hidden');
             const data = getFluxDataCentral();
             renderFluxEditorCentral(data);
@@ -5243,7 +5243,7 @@ el.classList.add('group'); // For hover effect on handle
 
         // --- GESTION CENTRALE PARC MACHINES & PLAFONDS ---
         function openParcModal() {
-            const menu = document.getElementById('burgerMenu');
+            const menu = document.getElementById('unifiedMenu');
             if (menu) menu.classList.add('hidden');
             try {
                 let cfgStr = localStorage.getItem('caf_constraints');
@@ -5359,7 +5359,7 @@ el.classList.add('group'); // For hover effect on handle
 
         // --- GESTION CENTRALE RH FORMATEURS ---
         function openRHModal() {
-            const menu = document.getElementById('burgerMenu');
+            const menu = document.getElementById('unifiedMenu');
             if (menu) menu.classList.add('hidden');
             renderRHEditorCentral();
             const modal = document.getElementById('rhModal');
